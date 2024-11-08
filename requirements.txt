@@ -1,0 +1,11 @@
+CTkTable==1.1
+customtkinter==5.2.2
+darkdetect==0.8.0
+importlib-resources==5.13.0
+inflection==0.5.1
+lgpio==0.2.2.0
+packaging==24.1
+PyYAML==6.0.2
+rpi-lgpio==0.6
+spidev==3.6
+vcgencmd==0.1.1
