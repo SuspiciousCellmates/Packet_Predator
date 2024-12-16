@@ -5,7 +5,7 @@ from enum import Enum
 from nodes.node import Node
 import struct
 
-class PacketType(Enum):
+class PayloadType(Enum):
     SYNC = 0
     CONFIG = 1
     EVENT = 2   # EVENT
@@ -25,7 +25,7 @@ class Packet:
     
     src_address: Optional[int] = None
     dest_address: Optional[int] = None
-    packet_type: Optional[PacketType] = None
+    payload_type: Optional[PayloadType] = None
     timestamp: Optional[Any] = None
     staged_payload: Optional[Any] = None
     
@@ -33,7 +33,7 @@ class Packet:
         return f"Packet:\n \
 dest_address={self.dest_address}\n \
 src_address={self.src_address}\n \
-packet_type={self.packet_type}\n \
+packet_type={self.payload_type}\n \
 timestamp={self.timestamp}\n \
 payload={self.staged_payload}\n"
         
@@ -94,7 +94,7 @@ payload={self.staged_payload}\n"
             self.header_fmt,
             self.dest_address,
             self.src_address,
-            self.packet_type.value,  # Ensure we use the enum value
+            self.payload_type.value,  # Ensure we use the enum value
             self.timestamp  # Convert datetime to a UNIX timestamp
         )
         

@@ -2,7 +2,7 @@ import customtkinter as ctk
 from driver.nrf905 import NRF905
 from gui.custom.pp_combobox import MyComboBox
 from nodes.node import Node, NodeType
-from packet.packet import PacketType, Packet
+from packet.packet import PayloadType, Packet
 from packet.payload_values import *
 from datetime import datetime
 
@@ -19,7 +19,7 @@ class SpoofSettings(ctk.CTkFrame):
         
         self.dest_node: Node = None
         self.src_node: Node = None
-        self.packet_type: PacketType = None
+        self.packet_type: PayloadType = None
         self.packet= Packet()
 
     def setup_gui(self):
@@ -91,7 +91,7 @@ class SpoofSettings(ctk.CTkFrame):
         self.payload_label = ctk.CTkLabel(self.payload_type_frame, text="Payload Type")
         self.payload_label.pack(side='left', padx= 20)
         
-        self.payloads = MyComboBox(self.payload_type_frame, values=[e.name for e in PacketType], width= 400, command= self.populate_payload_frame)
+        self.payloads = MyComboBox(self.payload_type_frame, values=[e.name for e in PayloadType], width= 400, command= self.populate_payload_frame)
         self.payloads.pack(side='left')
         
         self.payload_config_frame = ctk.CTkScrollableFrame(self.input_frame, width = 500, height=300)
@@ -125,7 +125,7 @@ class SpoofSettings(ctk.CTkFrame):
             combo_box.set("No Nodes Available")
 
     def pack_payload_value(self, packet_type, entry, value):
-        self.packet.packet_type = packet_type
+        self.packet.payload_type = packet_type
             
         index = self.controller.settings[entry]
         if value:
@@ -141,7 +141,7 @@ class SpoofSettings(ctk.CTkFrame):
         for widget in self.payload_config_frame.winfo_children():
             widget.destroy()
         self.packet.unstage_payload()
-        self.packet_type = getattr(PacketType, self.payloads.get(), None)
+        self.packet_type = getattr(PayloadType, self.payloads.get(), None)
         if selected_value == "CONFIG":
             settings = self.dest_node.config_settings
             for i, entry in enumerate(settings):

@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 
 # Put what you are currently working on here (in case of context switch):
-
-
-
 import customtkinter
 from gui.main_menu import MainMenu
 from gui.spoof_settings import SpoofSettings
