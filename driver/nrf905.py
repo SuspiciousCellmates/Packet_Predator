@@ -1,15 +1,49 @@
 # File: nrf905.py
-import spidev
-import RPi.GPIO as GPIO
 import time
-from driver.nrf905_config import NRF905Config
 import struct
+import logging
+from typing import Optional
+
+spidev = None
+GPIO = None
+HARDWARE_IMPORT_ERROR = None
+
+try:
+    import spidev
+    import RPi.GPIO as GPIO
+    HAS_HARDWARE = True
+except (ModuleNotFoundError, RuntimeError, ImportError) as e:
+    HAS_HARDWARE = False
+    HARDWARE_IMPORT_ERROR = e
+
+logger = logging.getLogger("nrf905")
+
+DEFAULT_CONFIG = {
+    'CH_NO': 0x6C,
+    'AUTO_RETRAN': 0,
+    'RX_RED_PWR': 0,
+    'PA_PWR': 3,
+    'HFREQ_PLL': 0,
+    'CH_NO_MSB': 0,
+    'RX_AFW': 4,
+    'TX_AFW': 4,
+    'TX_PW': 32,
+    'RX_PW': 32,
+    'RX_ADDRESS': 0xDEADBEEF,
+    'CRC_MODE': 0,
+    'CRC_EN': 0,
+    'XOF': 3,
+    'UP_CLK_EN': 0,
+    'UP_CLK_FREQ': 0,
+}
 
 RX_PAYLOAD = 0x24
 TX_PAYLOAD = 0x20
 
 class NRF905:
     def __init__(self, config, csn=8, pwr=21, ce=7, txen=23, dr=17, use_dr=True, am=22, use_am=True, cd=18, use_cd=False):
+        global HAS_HARDWARE, HARDWARE_IMPORT_ERROR
+
         self.csn = csn
         self.pwr = pwr
         self.ce = ce
@@ -17,20 +51,54 @@ class NRF905:
         self.dr = dr
         self.am = am
         self.cd = cd
-        self.spi = spidev.SpiDev()
+        self.spi = None
+        self.has_hardware = HAS_HARDWARE
         self.current_mode = 'rx'
-        self.config = config
+        self.config = bytearray(10)
+        self._simulation_config = DEFAULT_CONFIG.copy()
         self.use_dr = use_dr
         self.use_am = use_am
         self.use_cd = use_cd
         
         self.radio_configured = False
+        self._virtual_address = None
 
-        self.setup()
-        self.write_config(self.config)
+        if self.has_hardware:
+            try:
+                self.spi = spidev.SpiDev()
+                self.setup()
+            except (OSError, RuntimeError) as exc:
+                logger.warning("Hardware initialization failed; using simulator mode: %s", exc)
+                if self.spi is not None:
+                    self.spi.close()
+                self.spi = None
+                self.has_hardware = False
+                HAS_HARDWARE = False
+                HARDWARE_IMPORT_ERROR = exc
+        else:
+            logger.info("Hardware modules unavailable; using simulator mode: %s", HARDWARE_IMPORT_ERROR)
+
+        self.write_config(config)
+
+    @property
+    def virtual_address(self) -> Optional[int]:
+        return self._virtual_address
+
+    @virtual_address.setter
+    def virtual_address(self, val: Optional[int]):
+        from driver.virtual_airwaves import airwaves
+        if self._virtual_address is not None:
+            airwaves.unregister(self._virtual_address)
+        self._virtual_address = val
+        if val is not None:
+            airwaves.register(val)
 
 
     def setup(self):
+        if not self.has_hardware:
+            self.radio_configured = True
+            return
+
         # Initialize SPI
         self.spi.open(0, 0)  # Bus 0, device 0
         self.spi.max_speed_hz = 125000
@@ -68,10 +136,14 @@ class NRF905:
 ###############################################################################
 
     def read_config_binary(self, length):
+        if not self.has_hardware:
+            return self.config[:length]
         data = self.spi.xfer2([0x10] + [0x00] * length)
         return data[1:]  # Ignore the status byte
 
     def read_config_human(self):
+        if not self.has_hardware:
+            return self._simulation_config.copy()
         config = self.read_config_binary(10)
         return {
             'CH_NO': config[0],
@@ -96,42 +168,38 @@ class NRF905:
         }
 
     def write_config(self, config_values=None, print_values=False):
-        self.set_mode('idle')
-        
-        # Default configuration values
-        default_config_values = {
-            'CH_NO': 0x6C,'AUTO_RETRAN': 0, 'RX_RED_PWR': 0, 
-            'PA_PWR': 3, 'HFREQ_PLL': 0, 'CH_NO_MSB': 0,
-            'RX_AFW': 4,'TX_AFW': 4, 
-            'TX_PW': 32,
-            'RX_PW': 32,
-            'RX_ADDRESS': 0xDEADBEEF,
-            'CRC_MODE': 0, 'CRC_EN': 0, 'XOF': 3, 'UP_CLK_EN': 0, 'UP_CLK_FREQ': 0
-        }
+        config = DEFAULT_CONFIG.copy()
+        if config_values:
+            config.update(config_values)
 
-        # Use provided config_values or defaults
-        config_values = config_values or default_config_values
+        if self.has_hardware:
+            self.set_mode('idle')
         
         if print_values:
-            print(f"Going to store: {config_values}")
+            logger.info("Going to store: %s", config)
         
         # Build configuration byte array
         self.config = bytearray(10)
-        self.config[0] = config_values['CH_NO']
-        self.config[1] = (config_values['AUTO_RETRAN'] << 5 |
-                        config_values['RX_RED_PWR'] << 4 |
-                        config_values['PA_PWR'] << 2 |
-                        config_values['HFREQ_PLL'] << 1 |
-                        config_values['CH_NO_MSB'])
-        self.config[2] = config_values['TX_AFW'] << 4 | config_values['RX_AFW']
-        self.config[3] = config_values['RX_PW']
-        self.config[4] = config_values['TX_PW']
-        self.config[5:9] = config_values['RX_ADDRESS'].to_bytes(4, 'little')
-        self.config[9] = (config_values['CRC_MODE'] << 7 |
-                        config_values['CRC_EN'] << 6 |
-                        config_values['XOF'] << 3 |
-                        config_values['UP_CLK_EN'] << 2 |
-                        config_values['UP_CLK_FREQ'])
+        self.config[0] = config['CH_NO']
+        self.config[1] = (config['AUTO_RETRAN'] << 5 |
+                        config['RX_RED_PWR'] << 4 |
+                        config['PA_PWR'] << 2 |
+                        config['HFREQ_PLL'] << 1 |
+                        config['CH_NO_MSB'])
+        self.config[2] = config['TX_AFW'] << 4 | config['RX_AFW']
+        self.config[3] = config['RX_PW']
+        self.config[4] = config['TX_PW']
+        self.config[5:9] = config['RX_ADDRESS'].to_bytes(4, 'little')
+        self.config[9] = (config['CRC_MODE'] << 7 |
+                        config['CRC_EN'] << 6 |
+                        config['XOF'] << 3 |
+                        config['UP_CLK_EN'] << 2 |
+                        config['UP_CLK_FREQ'])
+
+        if not self.has_hardware:
+            self._simulation_config = config
+            self.radio_configured = True
+            return self.config
         
         # Write configuration
         self.spi.xfer2([0x00] + list(self.config))
@@ -139,7 +207,7 @@ class NRF905:
         # Read back configuration to verify
         self.config = self.read_config_binary(10)
         if print_values:
-            print(f"Config written and read back: {self.config}")
+            logger.info("Config written and read back: %s", self.config)
         self.radio_configured = True
         return self.config
 
@@ -164,19 +232,30 @@ class NRF905:
         self.spi.xfer2([0x20] + data)
 
     def tx(self, data, address, max_retries=20, retry_delay=0.1):
+        if not self.has_hardware:
+            from driver.virtual_airwaves import airwaves
+            src_addr = self.virtual_address if self.virtual_address is not None else 0x0000
+            airwaves.transmit(data, src_addr)
+            return True
+
         TX_OK = False
         # Check for valid length
         if len(data) > 32:
-            print("Packet too large")
+            logger.error("Packet too large")
             return TX_OK
         
         self.set_mode('idle')
         self.write_tx_address(address)
         self.write_tx_payload(data)
         self.set_mode('tx')
+        start_time = time.monotonic()
         while not GPIO.input(self.dr):
-            pass
-        TX_OK = True
+            if time.monotonic() - start_time > 0.1: # 100ms timeout
+                logger.error("TX timeout waiting for DR pin")
+                break
+            time.sleep(0.001)
+        else:
+            TX_OK = True
         GPIO.output(self.ce, GPIO.LOW)
         GPIO.output(self.txen, GPIO.LOW)
         self.set_mode('rx')
@@ -186,18 +265,17 @@ class NRF905:
 #   RX functions
 ###############################################################################   
     def rx(self):
-        '''
-        Notes: it appears that xfer2 consumes the bytes it reads, meaning once read those bytes are discarded
-        from the SPI register. This makes it somewhat tricky, since we need to read the payload length from 
-        the header, then use that length to correctly read the response. However the consumption means that 
-        'response' gets populated without the length data, so we add it back in front of the list that is returned
-        from the seconds spi read.
-        
-        Furthermore, the spi xfer operations seem to return a response byte (usually either 225 or 160) in the first
-        read for length, it returns a tuple (response_byte, value) so we index the correct value to obtain the length keeping in mind
-        the data size that payload length gets encoded as. I would prefer to encode as 2 bytes ('H'), hence we need to pull out 2 of the
-        bytes
-        '''
+        if not self.has_hardware:
+            from driver.virtual_airwaves import airwaves
+            if self.virtual_address is not None:
+                airwaves.register(self.virtual_address)
+                packet = airwaves.receive(self.virtual_address)
+                if packet:
+                    return True, packet
+            # Sleep slightly to prevent high CPU load in the background sniff loop
+            time.sleep(0.01)
+            return False, None
+
         self.set_mode('rx')
         response = []
         RX_OK = False
@@ -218,6 +296,8 @@ class NRF905:
 #   Chip Management functions
 ###############################################################################    
     def set_power_mode(self, mode):
+        if not self.has_hardware:
+            return
         if mode == 'down':
             GPIO.output(self.pwr, GPIO.LOW)
         elif mode == 'up':
@@ -226,6 +306,9 @@ class NRF905:
             raise ValueError("Invalid power mode. Use 'up' or 'down'")
             
     def set_mode(self, mode):
+        if not self.has_hardware:
+            self.current_mode = mode
+            return
         if self.current_mode != mode:
             if mode == 'tx':
                 GPIO.output(self.txen, GPIO.HIGH)
@@ -241,7 +324,11 @@ class NRF905:
             self.current_mode = mode
         
     def cleanup(self):
-        self.spi.close()
+        if not self.has_hardware:
+            self.virtual_address = None
+            return
+        if self.spi is not None:
+            self.spi.close()
         GPIO.cleanup()
 
     def __enter__(self):

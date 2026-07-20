@@ -8,16 +8,19 @@ import struct
 class PayloadType(Enum):
     SYNC = 0
     CONFIG = 1
-    EVENT = 2   # EVENT
-    START = 3   # EVENT
-    STOP = 4    # EVENT
-    ERROR = 5   # EVENT
+    EVENT = 2
+    START = 3
+    STOP = 4
+    LOBBY_DISCOVERY = 5
+    LOBBY_REGISTRATION = 6
+    DIAGNOSTIC = 7
+    ERROR = 8
     ACK = 64
     NACK = 128
      
 @dataclass
 class Packet:
-    header_fmt = "<HHBH"
+    header_fmt = "<HHBB"
 
     PACKET_SIZE = 32
     HEADER_SIZE = struct.calcsize(header_fmt)
@@ -29,6 +32,14 @@ class Packet:
     timestamp: Optional[Any] = None
     staged_payload: Optional[Any] = None
     
+    @property
+    def payload(self):
+        return self.staged_payload
+
+    @payload.setter
+    def payload(self, value):
+        self.staged_payload = value
+
     def __str__(self):
         return f"Packet:\n \
 dest_address={self.dest_address}\n \
@@ -60,8 +71,14 @@ payload={self.staged_payload}\n"
         
     def _encode_payload(self):                    
         # Ensure payload doesn't exceed max size
+        if isinstance(self.staged_payload, (bytes, bytearray)):
+            return self.staged_payload
+
         payload = bytearray()
-        
+
+        if self.staged_payload is None:
+            return payload
+
         for key, value in self.staged_payload.items():
             int_key = int(key)
             if int_key > 255:
@@ -108,5 +125,8 @@ payload={self.staged_payload}\n"
         
         if len(packet) > self.PACKET_SIZE:
             raise ValueError("Final packet exceeds allowed size")
-        
+
+        # Pad the packet with 0x00 to reach exactly PACKET_SIZE (32 bytes)
+        packet = packet + b'\x00' * (self.PACKET_SIZE - len(packet))
+
         return packet

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Packet Predator - operator console</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-content">
+            <div class="title-group">
+                <h1>PACKET PREDATOR</h1>
+                <p class="subtitle">AMONG US IRL DIAGNOSTIC CONSOLE</p>
+            </div>
+            <div class="status-group" style="display: flex; align-items: center; gap: 12px;">
+                <span id="radio-mode-badge" class="badge badge-warning">Checking Radio...</span>
+                <span id="stream-status-badge" class="badge badge-error">Stream Off</span>
+                <button id="btn-game-control" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.78rem;">Start Match</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard-grid">
+        <!-- SNIFFER SECTION -->
+        <section class="panel sniffer-panel">
+            <div class="panel-header">
+                <h2>Live Packet Sniffer</h2>
+                <div class="panel-actions">
+                    <button id="btn-toggle-sniff" class="btn btn-primary">Start Sniffing</button>
+                    <button id="btn-clear-sniff" class="btn btn-secondary">Clear Logs</button>
+                </div>
+            </div>
+            <!-- FILTER BAR -->
+            <div class="filter-bar" style="display: flex; gap: 15px; align-items: center; padding: 10px 20px; background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid var(--border-color); font-size: 0.8rem; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <input type="checkbox" id="filter-hide-diagnostics" checked style="cursor: pointer;">
+                    <label for="filter-hide-diagnostics" style="cursor: pointer; color: var(--text-secondary); user-select: none;">Hide Heartbeats (DIAGNOSTIC)</label>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
+                    <label for="filter-search" style="color: var(--text-secondary);">Search:</label>
+                    <input type="text" id="filter-search" placeholder="Type, Src, Dest..." style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 4px 8px; color: var(--text-primary); font-size: 0.75rem; width: 150px;">
+                </div>
+            </div>
+            <div class="table-container">
+                <table id="sniff-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 5%;">ID</th>
+                            <th style="width: 22%;">Source Node</th>
+                            <th style="width: 22%;">Destination Node</th>
+                            <th style="width: 16%;">Direction</th>
+                            <th style="width: 12%;">Type</th>
+                            <th style="width: 11%;">Timestamp</th>
+                            <th style="width: 12%;">Raw Length</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sniff-tbody">
+                        <tr class="empty-row">
+                            <td colspan="7">No packets captured yet. Start sniffing to monitor network.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- UTILITY COLUMN -->
+        <div class="utility-col">
+            <!-- MAP PANEL -->
+            <section id="sim-map-panel" class="panel map-panel" style="display: none;">
+                <div class="panel-header">
+                    <h2>Virtual Proximity Map</h2>
+                </div>
+                <div class="panel-form" style="padding-top: 10px; padding-bottom: 15px;">
+                    <canvas id="sim-map-canvas" width="600" height="450" style="background: rgba(5, 7, 15, 0.9); border-radius: var(--radius-sm); border: 1px solid var(--border-color); width: 100%; display: block;"></canvas>
+                    <div style="display: flex; justify-content: space-around; font-size: 0.72rem; color: var(--text-secondary); margin-top: 10px; flex-wrap: wrap; gap: 8px;">
+                        <span><span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; margin-right: 4px;"></span>Crewmate</span>
+                        <span><span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; margin-right: 4px;"></span>Impostor</span>
+                        <span><span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #6b7280; margin-right: 4px;"></span>Ghost</span>
+                        <span><span style="display: inline-block; width: 8px; height: 8px; background: #3b82f6; margin-right: 4px;"></span>Task Node</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SIM CONTROL PANEL -->
+            <section id="sim-control-panel" class="panel sim-control-panel" style="display: none;">
+                <div class="panel-header">
+                    <h2>Simulation Debug Controls</h2>
+                </div>
+                <div class="panel-form" style="padding-top: 15px; padding-bottom: 15px; display: flex; flex-direction: column; gap: 15px;">
+                    <!-- Configuration Row -->
+                    <div style="display: flex; gap: 10px; align-items: flex-end;">
+                        <div class="form-group" style="flex: 1; margin: 0;">
+                            <label for="sim-crew-count" style="font-size: 0.72rem;">Crewmates</label>
+                            <input type="number" id="sim-crew-count" value="3" min="1" max="5" style="padding: 4px 8px; font-size: 0.75rem;">
+                        </div>
+                        <div class="form-group" style="flex: 1; margin: 0;">
+                            <label for="sim-impostor-count" style="font-size: 0.72rem;">Impostors</label>
+                            <input type="number" id="sim-impostor-count" value="1" min="1" max="2" style="padding: 4px 8px; font-size: 0.75rem;">
+                        </div>
+                        <button id="btn-sim-reset" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: rgba(255,255,255,0.05); color: var(--text-primary); cursor: pointer;">Reset Sim</button>
+                    </div>
+
+                    <!-- Difficulty Profile Selector -->
+                    <div style="display: flex; gap: 10px; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
+                        <div class="form-group" style="flex: 1; margin: 0;">
+                            <label for="sim-difficulty" style="font-size: 0.72rem;">Game Mode (Difficulty Profile)</label>
+                            <select id="sim-difficulty" style="padding: 4px 8px; font-size: 0.75rem; width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary);">
+                                <option value="easy">Kids Mode (Easy - No lockouts)</option>
+                                <option value="medium" selected>Standard Mode (Medium - 5s lockouts)</option>
+                                <option value="hard">Hardcore Mode (Hard - 15s lockouts)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Global Actions -->
+                    <div style="display: flex; gap: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
+                        <button id="btn-trigger-meeting" class="btn" style="flex: 1; padding: 6px 10px; font-size: 0.72rem; background: #eab308; color: #000; font-weight: 600; cursor: pointer; border: none; border-radius: var(--radius-sm);">Force Meeting</button>
+                        <button id="btn-trigger-sabotage" class="btn" style="flex: 1; padding: 6px 10px; font-size: 0.72rem; background: #ef4444; color: #fff; font-weight: 600; cursor: pointer; border: none; border-radius: var(--radius-sm);">Force Sabotage</button>
+                    </div>
+
+                    <!-- Players Status List Table -->
+                    <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
+                        <h3 style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: space-between;">
+                            <span>Player Badges</span>
+                        </h3>
+                        <div style="max-height: 180px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.05); border-radius: var(--radius-sm); background: rgba(0,0,0,0.2);">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.72rem; text-align: left;">
+                                <thead style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <tr>
+                                        <th style="padding: 6px; color: var(--text-secondary);">Name</th>
+                                        <th style="padding: 6px; color: var(--text-secondary);">State</th>
+                                        <th style="padding: 6px; text-align: right; color: var(--text-secondary);">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sim-players-tbody">
+                                    <tr>
+                                        <td colspan="3" style="padding: 10px; text-align: center; color: var(--text-muted);">Simulation loading...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SPOOF PANEL -->
+            <section class="panel spoof-panel">
+                <div class="panel-header">
+                    <h2>Transmit / Spoof Packet</h2>
+                </div>
+                <form id="spoof-form" class="panel-form">
+                    <div class="form-group">
+                        <label for="spoof-mode">Transaction Mode</label>
+                        <select id="spoof-mode" required>
+                            <option value="COMMAND" selected>Command (Controller → Spoke)</option>
+                            <option value="TELEMETRY">Telemetry (Spoke → Controller)</option>
+                            <option value="RAW">Raw Override (Custom Packet)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row" id="spoof-src-row">
+                        <div class="form-group">
+                            <label for="spoof-src-type">Source Node Type</label>
+                            <select id="spoof-src-type" required>
+                                <option value="GAME_CONTROLLER">GAME_CONTROLLER</option>
+                                <option value="PLAYER">PLAYER</option>
+                                <option value="TASK">TASK</option>
+                                <option value="GOD">GOD</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="spoof-src-id">Source Node ID</label>
+                            <input type="number" id="spoof-src-id" value="1" min="0" max="255" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row" id="spoof-dest-row">
+                        <div class="form-group">
+                            <label for="spoof-dest-type">Destination Node Type</label>
+                            <select id="spoof-dest-type" required>
+                                <option value="TASK">TASK</option>
+                                <option value="PLAYER">PLAYER</option>
+                                <option value="GAME_CONTROLLER">GAME_CONTROLLER</option>
+                                <option value="GOD">GOD</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="spoof-dest-id">Destination Node ID</label>
+                            <select id="spoof-dest-node" required>
+                                <option value="" disabled selected>Select Node</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="spoof-payload-type">Payload Type</label>
+                        <select id="spoof-payload-type" required>
+                            <option value="SYNC">SYNC</option>
+                            <option value="CONFIG">CONFIG</option>
+                            <option value="EVENT">EVENT</option>
+                            <option value="START">START</option>
+                            <option value="STOP">STOP</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="payload-fields-container">
+                        <!-- Dynamic payload inputs populated by JS -->
+                    </div>
+
+                    <button type="submit" id="btn-launch-packet" class="btn btn-accent btn-full">Launch Packet</button>
+                </form>
+            </section>
+
+            <!-- CONFIG PANEL -->
+            <section class="panel config-panel">
+                <div class="panel-header">
+                    <h2>nRF905 Register Configuration</h2>
+                </div>
+                <form id="config-form" class="panel-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="cfg-channel">RF Channel (0-255)</label>
+                            <input type="number" id="cfg-channel" min="0" max="255" required>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label for="cfg-auto-retran">Auto Retransmit</label>
+                            <input type="checkbox" id="cfg-auto-retran" class="toggle-switch">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="cfg-rx-pwr">Rx Sensitivity</label>
+                            <select id="cfg-rx-pwr" required>
+                                <option value="0">Normal Operation</option>
+                                <option value="1">Reduced Power</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfg-pa-pwr">PA Output Power</label>
+                            <select id="cfg-pa-pwr" required>
+                                <option value="0">-10 dBm</option>
+                                <option value="1">-2 dBm</option>
+                                <option value="2">+6 dBm</option>
+                                <option value="3">+10 dBm</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="cfg-address">Physical Match Address (Hex)</label>
+                            <input type="text" id="cfg-address" pattern="^[0-9a-fA-F]{2,8}$" placeholder="DEADBEEF" required>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label for="cfg-crc-en">CRC Checksum</label>
+                            <input type="checkbox" id="cfg-crc-en" class="toggle-switch">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="cfg-crc-mode">CRC Mode</label>
+                            <select id="cfg-crc-mode" required>
+                                <option value="0">8-bit</option>
+                                <option value="1">16-bit</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfg-xof">Crystal Frequency</label>
+                            <select id="cfg-xof" required>
+                                <option value="0">4 MHz</option>
+                                <option value="1">8 MHz</option>
+                                <option value="2">12 MHz</option>
+                                <option value="3">16 MHz</option>
+                                <option value="4">20 MHz</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-secondary btn-full">Save Radio Config</button>
+                </form>
+            </section>
+        </div>
+    </main>
+
+    <!-- PACKET DETAIL MODAL -->
+    <div id="detail-modal" class="modal-overlay">
+        <div class="modal-card">
+            <header class="modal-header">
+                <h3>Packet Detail</h3>
+                <button id="btn-close-modal" class="btn-close">&times;</button>
+            </header>
+            <div class="modal-body">
+                <table class="detail-metadata-table">
+                    <tbody>
+                        <tr><th>Source Address</th><td id="modal-src"></td></tr>
+                        <tr><th>Destination Address</th><td id="modal-dest"></td></tr>
+                        <tr><th>Payload Type</th><td id="modal-type"></td></tr>
+                        <tr><th>Timestamp</th><td id="modal-time"></td></tr>
+                        <tr><th>Raw Length</th><td id="modal-len"></td></tr>
+                    </tbody>
+                </table>
+                <h4>Decoded Payload</h4>
+                <div class="modal-payload-content" id="modal-payload">
+                    <!-- JSON or structured metadata -->
+                </div>
+            </div>
+            <footer class="modal-footer">
+                <button id="btn-close-modal-footer" class="btn btn-secondary">Close</button>
+            </footer>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>

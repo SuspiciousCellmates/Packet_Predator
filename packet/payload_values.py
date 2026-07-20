@@ -16,10 +16,11 @@ VALID_CONFIG_SETTINGS = {
 }
 
 class EVENT_TYPES(Enum): 
-    INIT = auto()
-    START = auto()
-    STOP = auto()
-    SABOTAGE = auto()
-    COMPLETED = auto()
-    RUNNING = auto()
-    PAUSE = auto()
+    MEETING_START = 1
+    MEETING_END = 2
+    MATCH_END = 3
+    SABOTAGE = 4
+    COMPLETED = 5
+    CHECK_IN = 6
+    PLAYER_DEATH = 7
+    TASK_FAIL = 8
