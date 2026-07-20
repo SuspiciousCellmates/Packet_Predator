@@ -1,0 +1,7 @@
+# Ideas parking lot
+
+- Export and import capture sessions in a standard analysis format.
+- Add byte-level frame diff and annotation views.
+- Add fuzz and malformed-frame corpora after the reference codec exists.
+- Explore pluggable transport discovery after the transport interface is approved.
+- Add authenticated remote workbench access only after threat modelling.

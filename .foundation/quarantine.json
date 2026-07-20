@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "status": "unsupported-quarantined",
+  "policy": "Preserve in Git during foundation; do not expose as supported Packet Predator scope or extend it.",
+  "entries": [
+    {
+      "id": "coordinator",
+      "file": "web_app.py",
+      "evidence": ["class GameCoordinator", "app.state.coordinator"],
+      "future_owner": "Game Controller after inventory review"
+    },
+    {
+      "id": "autonomous-simulation",
+      "file": "simulator.py",
+      "evidence": ["class VirtualSpokeNode", "class VirtualPlayerNode", "class VirtualTaskNode"],
+      "future_owner": "Separate deterministic scenario simulation"
+    },
+    {
+      "id": "map",
+      "file": "web_app.py",
+      "evidence": ["/api/sim/map"],
+      "future_owner": "Scenario tooling if later approved"
+    },
+    {
+      "id": "difficulty",
+      "file": "web_app.py",
+      "evidence": ["/api/sim/difficulty", "app.state.difficulty"],
+      "future_owner": "Game Controller"
+    },
+    {
+      "id": "meeting",
+      "file": "web_app.py",
+      "evidence": ["MEETING_START", "action == \"meeting\""],
+      "future_owner": "Game Controller and explicit God Tool workflow after review"
+    },
+    {
+      "id": "kill",
+      "file": "web_app.py",
+      "evidence": ["action == \"kill\"", "PLAYER_DEATH"],
+      "future_owner": "Game Controller and explicit God Tool workflow after review"
+    },
+    {
+      "id": "sabotage",
+      "file": "web_app.py",
+      "evidence": ["SABOTAGE", "relaying sabotage event"],
+      "future_owner": "Game Controller and explicit God Tool workflow after review"
+    },
+    {
+      "id": "rules-engine",
+      "file": "web_app.py",
+      "evidence": ["Rules Engine", "RulesEngine", "TASK_FAIL"],
+      "future_owner": "Game Controller"
+    },
+    {
+      "id": "game-start-stop",
+      "file": "web_app.py",
+      "evidence": ["/api/game/start", "/api/game/stop"],
+      "future_owner": "Game Controller and God Tool after inventory review"
+    }
+  ]
+}

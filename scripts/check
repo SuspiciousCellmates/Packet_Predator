@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$repo_root"
+
+if [ -x .venv/bin/python ]; then
+    python_bin=.venv/bin/python
+else
+    python_bin=python3
+fi
+
+"$python_bin" scripts/foundation_check.py
+"$python_bin" -m unittest discover -s tests -v

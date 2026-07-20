@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "active_lane": "Now",
+  "milestone_id": "foundation-protocol-workbench",
+  "status": "active",
+  "started": "2026-07-20",
+  "mission": "Preserve the prototype, establish shared protocol ownership, document boundaries, and enforce scope without runtime changes.",
+  "runtime_changes_allowed": false,
+  "protocol_authority": "../Protocol_Contract",
+  "runtime_freeze": {
+    "enforced": true,
+    "snapshot_tag": "packet-predator-v0-experimental",
+    "manifest": ".foundation/runtime-freeze.sha256",
+    "replacement_requires_adr": true,
+    "replacement_adr": null
+  },
+  "next_milestone": "component-message-inventory-review"
+}
