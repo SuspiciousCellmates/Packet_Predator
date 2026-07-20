@@ -31,10 +31,10 @@ Classification describes architectural intent, not work authorized during founda
 | Autonomous player/task actors | `simulator.py` | Separate deterministic scenario simulation |
 | Map and movement | `/api/sim/map`, map canvas/frontend | Scenario visualization outside core workbench |
 | Difficulty and penalty calculation | `/api/sim/difficulty`, task-fail rule | Game Controller policy |
-| Meeting workflow | simulation trigger and node state methods | Game Controller; explicit privileged action may surface through God Tool |
-| Kill workflow | simulation trigger/UI button and direct state mutation | Game Controller/God Tool according to reviewed authority |
-| Sabotage decisions and automatic relay | virtual player, trigger, radio rules path | Game Controller; explicit action through God Tool if approved |
-| Start/stop game endpoints | `/api/game/start`, `/api/game/stop` | Game Controller/God Tool workflow, not workbench product surface |
+| Meeting workflow | simulation trigger and node state methods | Game Controller; explicit privileged request may surface through Game Master Console |
+| Kill workflow | simulation trigger/UI button and direct state mutation | Game Controller policy; correction/intervention through Game Master Console |
+| Sabotage decisions and automatic relay | virtual player, trigger, radio rules path | Game Controller; explicit operator request through Game Master Console if approved |
+| Start/stop game endpoints | `/api/game/start`, `/api/game/stop` | Game Controller with Game Master Console workflow, not workbench product surface |
 | Embedded rules engine | task-fail penalty and sabotage relay in `RadioManager` | Game Controller |
 | Default Among Us node catalog | `DEFAULT_NODES` | Component/application configuration, not Packet Predator architecture |
 

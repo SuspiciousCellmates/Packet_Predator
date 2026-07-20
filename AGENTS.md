@@ -26,7 +26,7 @@ Before planning or editing, read:
 
 - Packet Predator is a developer packet workbench.
 - Never add game policy, automatic game decisions, rules-engine behavior, difficulty behavior, or orchestration.
-- Never add God Tool workflows or privileged operator actions.
+- Never add Game Master Console workflows or privileged live-operator actions.
 - Never define or redefine shared protocol constants, layouts, event values, node types, or setting indexes in Packet Predator.
 - The sibling Protocol Contract repository is the only shared protocol authority.
 - nRF905 is an experimental adapter, not a platform commitment.

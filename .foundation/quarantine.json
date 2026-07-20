@@ -31,19 +31,19 @@
       "id": "meeting",
       "file": "web_app.py",
       "evidence": ["MEETING_START", "action == \"meeting\""],
-      "future_owner": "Game Controller and explicit God Tool workflow after review"
+      "future_owner": "Game Controller and explicit Game Master Console workflow after review"
     },
     {
       "id": "kill",
       "file": "web_app.py",
       "evidence": ["action == \"kill\"", "PLAYER_DEATH"],
-      "future_owner": "Game Controller and explicit God Tool workflow after review"
+      "future_owner": "Game Controller and explicit Game Master Console workflow after review"
     },
     {
       "id": "sabotage",
       "file": "web_app.py",
       "evidence": ["SABOTAGE", "relaying sabotage event"],
-      "future_owner": "Game Controller and explicit God Tool workflow after review"
+      "future_owner": "Game Controller and explicit Game Master Console workflow after review"
     },
     {
       "id": "rules-engine",
@@ -55,7 +55,7 @@
       "id": "game-start-stop",
       "file": "web_app.py",
       "evidence": ["/api/game/start", "/api/game/stop"],
-      "future_owner": "Game Controller and God Tool after inventory review"
+      "future_owner": "Game Controller and Game Master Console after inventory review"
     }
   ]
 }

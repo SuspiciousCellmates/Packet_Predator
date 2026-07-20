@@ -30,7 +30,7 @@ The prototype may initialize autonomous simulated nodes and a coordinator automa
 
 - Defining protocol constants or wire layouts locally.
 - Owning game state, rules, difficulty, penalties, or automatic decisions.
-- Hosting God Tool workflows or privileged operator actions.
+- Hosting Game Master Console workflows or privileged live-operator actions.
 - Running autonomous scenario actors as an implicit application mode.
 - Committing to nRF905 as the platform transport.
 

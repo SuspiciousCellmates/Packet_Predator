@@ -373,7 +373,7 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
         "4. Refactor Packet Predator into protocol, transport, service, and thin web layers",
         "5. Replace the game simulator with deterministic replay/fake transport.",
         "6. Validate capture and transmission through one selected physical adapter.",
-        "7. Build Game Controller and God Tool separately against the shared contract.",
+        "7. Build Game Controller and Game Master Console as distinct deployed roles against the shared contract; a console platform or presentation components may be shared without sharing production capabilities.",
     ]
     positions = [roadmap.find(text) for text in ordered]
     if any(position < 0 for position in positions) or positions != sorted(positions):
