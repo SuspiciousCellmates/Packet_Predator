@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "active_lane": "Now",
-  "milestone_id": "deterministic-replay-fake-transport",
+  "milestone_id": "nrf905-physical-adapter-validation",
   "status": "active",
-  "started": "2026-07-22",
-  "mission": "Replay deliberate, repeatable frame recordings through an explicit fake transport without autonomous actors, game policy, or hardware.",
+  "started": "2026-07-23",
+  "mission": "Validate exact 32-byte capture and deliberate manual transmission in both directions through two Raspberry Pi 5 and nRF905 benches.",
   "runtime_changes_allowed": true,
   "protocol_authority": "../Protocol_Contract",
   "runtime_baseline": ".foundation/runtime-baseline.json",
@@ -13,8 +13,8 @@
     "snapshot_tag": "packet-predator-v0-experimental",
     "manifest": ".foundation/runtime-freeze.sha256",
     "replacement_requires_adr": true,
-    "replacement_adr": "docs/adr/0004-begin-deterministic-replay.md",
+    "replacement_adr": "docs/adr/0005-begin-nrf905-physical-validation.md",
     "legacy_files_remain_immutable": true
   },
-  "next_milestone": "physical-adapter-validation"
+  "next_milestone": "game-controller-and-console"
 }

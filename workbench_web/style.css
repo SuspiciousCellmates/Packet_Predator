@@ -79,7 +79,22 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .truth-card strong { font-size: 11px; }
 .truth-card small { color: var(--muted); font-size: 9px; margin-top: 3px; }
 
-.input-card, .replay-card, .result, .journal-card { border: 1px solid var(--line); border-radius: var(--radius); background: linear-gradient(145deg, rgba(18, 32, 34, .96), rgba(10, 20, 22, .96)); box-shadow: 0 18px 60px rgba(0,0,0,.16); }
+.input-card, .replay-card, .radio-card, .result, .journal-card { border: 1px solid var(--line); border-radius: var(--radius); background: linear-gradient(145deg, rgba(18, 32, 34, .96), rgba(10, 20, 22, .96)); box-shadow: 0 18px 60px rgba(0,0,0,.16); }
+.radio-card { margin-bottom: 18px; padding: 19px; border-color: rgba(97, 215, 220, .25); }
+.radio-card h3 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
+.radio-listening { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(97, 215, 220, .28); border-radius: 999px; padding: 6px 9px; color: #b7d5d6; background: rgba(97, 215, 220, .06); font-size: 9px; font-weight: 650; white-space: nowrap; }
+.radio-listening i { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 9px rgba(97, 215, 220, .65); }
+.radio-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-top: 16px; }
+.radio-grid > div { min-width: 0; padding: 11px; border: 1px solid var(--line-soft); border-radius: 8px; background: rgba(7, 16, 17, .48); }
+.radio-grid small, .radio-grid strong, .radio-grid span { display: block; }
+.radio-grid small { color: var(--faint); font-size: 8px; text-transform: uppercase; letter-spacing: .1em; }
+.radio-grid strong { margin-top: 5px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radio-grid span { margin-top: 3px; color: var(--muted); font: 500 8px ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+.radio-actions { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.radio-actions > p { max-width: 570px; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.radio-transmit { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; }
+.transmit-confirm { color: #bdc8ca; font-size: 9px; display: inline-flex; align-items: center; gap: 6px; }
+.transmit-confirm input { accent-color: var(--acid); }
 .replay-card { margin-bottom: 18px; padding: 19px; }
 .replay-topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .replay-topline h3 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
@@ -246,6 +261,8 @@ td small { color: var(--faint); margin-top: 3px; font: 500 8px ui-monospace, SFM
   .intro h2 { font-size: 27px; }
   .input-actions { align-items: stretch; flex-direction: column; }
   .replay-topline, .replay-dashboard { align-items: stretch; flex-direction: column; }
+  .radio-grid { grid-template-columns: 1fr 1fr; }
+  .radio-actions, .radio-transmit { align-items: stretch; flex-direction: column; }
   .replay-picker-row { grid-template-columns: 1fr; gap: 10px; }
   .replay-controls { flex-wrap: wrap; }
   .schedule-item { grid-template-columns: 49px 20px 1fr; }

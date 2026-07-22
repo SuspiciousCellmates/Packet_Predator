@@ -1,3 +1,4 @@
 __pycache__/
 .lgd-nfy*
 .venv/
+config/*.local.json

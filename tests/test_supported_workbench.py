@@ -53,6 +53,12 @@ class SupportedWorkbenchTests(unittest.TestCase):
             self.wire.inspect("400100", "auto")
         self.assertEqual(raised.exception.code, "FRAME_TOO_SHORT")
 
+    def test_logical_example_becomes_exact_fixed_adapter_frame(self):
+        item = self.wire.list_examples()["examples"][0]
+        fixed = self.wire.fixed_frame(item["frame_hex"], "logical")
+        self.assertEqual(len(fixed), 32)
+        self.assertEqual(fixed.hex(), item["padded_frame_hex"])
+
     def test_service_is_truthfully_hardware_free_and_journals_manually(self):
         service = WorkbenchService(self.wire)
         status = service.status()
@@ -93,10 +99,6 @@ class BrowserAssetTests(unittest.TestCase):
             for name in forbidden:
                 self.assertNotIn(f"import {name}", content, f"{path.name} imports {name}")
 
-    def test_supported_runtime_does_not_use_random_behavior(self):
-        for path in (REPO_ROOT / "packet_predator").glob("*.py"):
-            self.assertNotIn("import random", path.read_text(encoding="utf-8"))
-
     def test_recording_player_controls_are_present_in_browser_surface(self):
         html = (REPO_ROOT / "workbench_web/index.html").read_text(encoding="utf-8")
         for identifier in (
@@ -108,6 +110,9 @@ class BrowserAssetTests(unittest.TestCase):
             "replaySpeed",
             "replaySchedule",
             "captureContext",
+            "radioCard",
+            "transmitConfirm",
+            "transmitButton",
         ):
             self.assertIn(f'id="{identifier}"', html)
 

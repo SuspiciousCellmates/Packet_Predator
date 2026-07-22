@@ -147,6 +147,21 @@ class WebApiTests(unittest.TestCase):
         self.assertFalse(result["carrier"]["can_transmit"])
         self.assertEqual([item["capture"]["sequence"] for item in result["delivered"]], [0])
 
+    def test_physical_routes_fail_clearly_in_default_inspect_only_mode(self):
+        status, _, body = asyncio.run(asgi_request("POST", "/api/carrier/poll"))
+        self.assertEqual(status, 422)
+        self.assertEqual(json.loads(body)["error"]["code"], "PHYSICAL_ADAPTER_UNAVAILABLE")
+
+        status, _, body = asyncio.run(
+            asgi_request(
+                "POST",
+                "/api/carrier/transmit",
+                {"frame_hex": "40010100", "mode": "auto", "confirmed": False},
+            )
+        )
+        self.assertEqual(status, 422)
+        self.assertEqual(json.loads(body)["error"]["code"], "TRANSMIT_CONFIRMATION_REQUIRED")
+
 
 if __name__ == "__main__":
     unittest.main()

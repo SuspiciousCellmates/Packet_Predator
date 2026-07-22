@@ -10,7 +10,8 @@ from typing import Any
 from uuid import uuid4
 
 from .replay import Recording, RecordingCatalog
-from .transport import CarrierFrame, DeterministicReplayTransport, InspectOnlyTransport, TransportError
+from .nrf905_transport import Nrf905Transport
+from .transport import CarrierFrame, DeterministicReplayTransport, InspectOnlyTransport, ReceiveTransport, TransportError
 from .wire_adapter import WireAdapter
 
 
@@ -20,7 +21,7 @@ class WorkbenchService:
     def __init__(
         self,
         wire: WireAdapter | None = None,
-        carrier: InspectOnlyTransport | None = None,
+        carrier: ReceiveTransport | None = None,
         replay_carrier: DeterministicReplayTransport | None = None,
         recording_root: Path | None = None,
     ) -> None:
@@ -45,6 +46,7 @@ class WorkbenchService:
             "journal_entries": count,
             "replay_available": True,
             "recording_count": len(self.recordings.list()),
+            "physical_adapter": self.carrier.status() if isinstance(self.carrier, Nrf905Transport) else None,
         }
 
     def catalog(self) -> dict[str, Any]:
@@ -94,6 +96,22 @@ class WorkbenchService:
     def replay_state(self) -> dict[str, Any]:
         return self._replay_response(self.replay_carrier.poll())
 
+    def poll_physical(self) -> dict[str, Any]:
+        carrier = self._physical_carrier()
+        delivered = [self._consume_physical(item) for item in carrier.poll()]
+        return {"carrier": carrier.status(), "delivered": delivered}
+
+    def transmit(self, frame_text: str, mode: str, confirmed: bool) -> dict[str, Any]:
+        if not confirmed:
+            raise TransportError(
+                "TRANSMIT_CONFIRMATION_REQUIRED",
+                "Confirm this deliberate RF transmission in the workbench before sending.",
+            )
+        carrier = self._physical_carrier()
+        frame = self.wire.fixed_frame(frame_text, mode)
+        delivered = self._consume_physical(carrier.send(frame))
+        return {"carrier": carrier.status(), "delivered": [delivered]}
+
     def journal(self) -> dict[str, Any]:
         with self._lock:
             entries = [
@@ -137,6 +155,27 @@ class WorkbenchService:
             "note": item.note,
         }
         return self._store(result, f"recording: {item.recording_id}", capture)
+
+    def _consume_physical(self, item: CarrierFrame) -> dict[str, Any]:
+        carrier = self._physical_carrier()
+        result = self.wire.inspect(item.frame.hex(), "fixed")
+        capture = {
+            "transport": "nrf905",
+            "profile_id": carrier.profile.identifier,
+            "sequence": item.sequence,
+            "observed_at_ms": item.at_ms,
+            "direction": item.direction,
+            "note": item.note,
+        }
+        return self._store(result, f"nrf905: {carrier.profile.identifier}", capture)
+
+    def _physical_carrier(self) -> Nrf905Transport:
+        if not isinstance(self.carrier, Nrf905Transport):
+            raise TransportError(
+                "PHYSICAL_ADAPTER_UNAVAILABLE",
+                "Start Packet Predator with an explicit nRF905 adapter profile first.",
+            )
+        return self.carrier
 
     def _store(
         self,

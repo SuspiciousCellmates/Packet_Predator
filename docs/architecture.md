@@ -19,11 +19,13 @@ The archived runtime remains frozen as evidence by `.foundation/runtime-freeze.s
 | Wire adapter | `packet_predator/wire_adapter.py` | Locate released Protocol Contract artifacts and expose decode/catalog/fixture operations without defining shared values |
 | Replay catalogue | `packet_predator/replay.py`, `recordings/` | Validate finite recording timetables and resolve released example references without game behavior |
 | Transport | `packet_predator/transport.py` | Publish the opaque-frame receive boundary; provide inspect-only and explicitly selected deterministic replay adapters |
+| Physical adapter | `packet_predator/adapters/nrf905.py`, `packet_predator/adapters/nrf905_linux.py`, `packet_predator/nrf905_transport.py` | Configure and move opaque fixed frames through an explicitly selected nRF905; isolate Linux SPI/GPIO imports and know no message semantics |
+| Deployment profile | `packet_predator/nrf905_profile.py`, `config/` | Strictly validate local SPI, GPIO, and radio settings without making them shared protocol constants |
 | Workbench service | `packet_predator/service.py` | Turn fixture, pasted, or replay-delivered bytes into inspectable entries and process-local history |
 | Thin web layer | `packet_predator/web.py` | Validate HTTP inputs, call the service, return JSON, and serve static files |
 | Browser UI | `workbench_web/` | Fixture browsing, search, summary, field/label inspection, validation feedback, and byte drill-down |
 
-Dependency direction is web → service → replay catalogue / transport / wire adapter. The replay catalogue resolves examples through an injected wire-adapter operation, then gives opaque frames to the transport. The transport never interprets them. The wire adapter alone loads the sibling reference codec. The supported runtime imports none of the archived modules.
+Dependency direction is web → service → replay catalogue / transport / wire adapter. The replay catalogue resolves examples through an injected wire-adapter operation, then gives opaque frames to the transport. The nRF905 transport accepts only complete fixed frames; it does not decode their fields. Linux-specific imports are confined to `packet_predator/adapters/nrf905_linux.py`. The wire adapter alone loads the sibling reference codec. The supported runtime imports none of the archived modules.
 
 ## Target boundaries
 
@@ -48,8 +50,8 @@ Dependency direction is web → service → replay catalogue / transport / wire 
 - `web/`: retain packet-workbench views where useful; quarantine map and game controls.
 - `simulator.py`: quarantine completely; preserve in Git until deterministic scenario replacement exists elsewhere.
 
-## Active replay constraint
+## Active physical-validation constraint
 
-ADR 0004 and `.foundation/runtime-baseline.json` authorize finite deterministic recordings and an explicit fake transport while retaining the old hash manifest as an archive-preservation check. Recordings are data, not a scenario engine: they cannot branch, react, choose, infer responses, or model component state. This milestone does not authorize a physical adapter, Game Controller policy, node emulator, or Game Master Console workflow.
+ADR 0005 and `.foundation/runtime-baseline.json` authorize one explicitly configured nRF905 adapter while retaining the old hash manifest as an archive-preservation check. Inspect-only remains the default. The adapter may capture a frame or execute one confirmed manual transmit request; it cannot construct responses, emulate a node, branch on message meaning, or implement Game Controller policy. Deterministic replay remains available under the ADR 0004 constraints.
 
 Packet Predator may impersonate a Game Controller or another participant only in an isolated bench environment. For integration testing it should drive a real Game Controller through an intentional test interface. A future shared console platform does not merge these deployed roles: the production Game Master Console must lack raw-frame injection, endpoint impersonation, and direct-node access in its backend permissions and network reach, not merely hide those controls.

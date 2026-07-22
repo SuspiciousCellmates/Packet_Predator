@@ -46,15 +46,38 @@
       <section class="inspector">
         <div class="intro">
           <div>
-            <p class="eyebrow accent">Hardware-free inspection</p>
-            <h2>Understand a frame before touching a radio.</h2>
-            <p>Pick a real example or paste hexadecimal bytes. Packet Predator checks them with the shared reference codec, then explains the route, meaning, and exact layout.</p>
+            <p class="eyebrow accent" id="modeEyebrow">Hardware-free inspection</p>
+            <h2 id="modeHeading">Understand a frame before touching a radio.</h2>
+            <p id="modeDescription">Pick a real example or paste hexadecimal bytes. Packet Predator checks them with the shared reference codec, then explains the route, meaning, and exact layout.</p>
           </div>
-          <div class="truth-card">
+          <div class="truth-card" id="truthCard">
             <span class="truth-icon" aria-hidden="true">⌁</span>
-            <div><strong>No live carrier</strong><small>Nothing here sends to a node.</small></div>
+            <div><strong id="truthTitle">No live carrier</strong><small id="truthDetail">Nothing here sends to a node.</small></div>
           </div>
         </div>
+
+        <section class="radio-card" id="radioCard" aria-labelledby="radioHeading" hidden>
+          <div class="replay-topline">
+            <div>
+              <p class="eyebrow accent">Physical validation bench</p>
+              <h3 id="radioHeading">nRF905 capture and deliberate transmit</h3>
+            </div>
+            <span class="radio-listening"><i></i> Listening · no automatic replies</span>
+          </div>
+          <div class="radio-grid">
+            <div><small>Profile</small><strong id="radioProfile">—</strong><span id="radioDevices">—</span></div>
+            <div><small>RF setting</small><strong id="radioFrequency">—</strong><span id="radioChannel">—</span></div>
+            <div><small>Physical address</small><strong id="radioAddress">—</strong><span id="radioCrc">—</span></div>
+            <div><small>Last check</small><strong id="radioActivity">Listening</strong><span id="radioPins">CD 0 · AM 0 · DR 0</span></div>
+          </div>
+          <div class="radio-actions">
+            <p>Received frames appear below automatically. To send, choose or paste a frame first; Packet Predator validates it and pads it to exactly 32 bytes.</p>
+            <div class="radio-transmit">
+              <label class="transmit-confirm"><input id="transmitConfirm" type="checkbox"> Confirm one RF transmission</label>
+              <button class="primary-button compact" id="transmitButton" type="button">Transmit current frame</button>
+            </div>
+          </div>
+        </section>
 
         <section class="replay-card" aria-labelledby="replayHeading">
           <div class="replay-topline">

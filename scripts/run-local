@@ -18,6 +18,10 @@ fi
 server_host=${PACKET_PREDATOR_HOST:-127.0.0.1}
 server_port=${PACKET_PREDATOR_PORT:-8000}
 
-echo "Packet Predator is starting in inspect-only mode."
+if [ -n "${PACKET_PREDATOR_ADAPTER_PROFILE:-}" ]; then
+    echo "Packet Predator is starting with explicit adapter profile: $PACKET_PREDATOR_ADAPTER_PROFILE"
+else
+    echo "Packet Predator is starting in inspect-only mode."
+fi
 echo "Open http://${server_host}:${server_port}"
 exec "$python_command" -m uvicorn packet_predator.web:app --host "$server_host" --port "$server_port"

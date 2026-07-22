@@ -31,6 +31,6 @@ Unknown fields are rejected deliberately. This prevents an innocent-looking reco
 - Keep endpoint assignments internally understandable when combining otherwise independent conformance examples.
 - Use repeated references deliberately when demonstrating retries or duplicate delivery.
 - Never add randomness, branching, conditions, actor state, success criteria, assertions about game policy, or automatic responses.
-- Run `./scripts/check`; malformed recordings and nondeterministic runtime imports must fail.
+- Run `./scripts/check`; malformed recording structure and invalid fixture references must fail.
 
 An actual captured-session import/export format remains parked for later design. These hand-authored recordings are small, reviewable demonstrations for this milestone.

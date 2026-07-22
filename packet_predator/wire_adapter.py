@@ -259,6 +259,20 @@ class WireAdapter:
             "destination_label": self._address_label(resolved_destination, True),
         }
 
+    def fixed_frame(self, frame_text: str, mode: str = "auto") -> bytes:
+        """Validate through the released codec and apply its declared fixed-adapter padding."""
+
+        compact, raw = _normalise_hex(frame_text)
+        decoded = self.codec.decode_frame(raw, mode=mode)
+        logical = decoded.logical_frame
+        size = int(self.registry_data["envelope"]["fixed_adapter_frame_size"])
+        padding = int(self.registry_data["envelope"]["fixed_adapter_padding_byte"])
+        if len(logical) > size:
+            raise InspectionError(
+                "FIXED_FRAME_TOO_LONG", f"The released adapter frame limit is {size} bytes."
+            )
+        return logical + bytes([padding]) * (size - len(logical))
+
     def _field_rows(self, definition: dict[str, Any], decoded: dict[str, Any]) -> list[dict[str, Any]]:
         rows = []
         offset = int(self.registry_data["envelope"]["header_size"])

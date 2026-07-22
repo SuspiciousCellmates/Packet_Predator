@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -12,9 +13,15 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .service import WorkbenchService
+from .adapters.nrf905 import Nrf905Error
+from .nrf905_profile import Nrf905ProfileError, load_nrf905_profile
+from .nrf905_transport import open_nrf905_transport
 from .replay import RecordingError
 from .transport import TransportError
 from .wire_adapter import AuthorityError, InspectionError
+
+
+_CONFIGURATION_ERRORS = (AuthorityError, RecordingError, Nrf905Error, Nrf905ProfileError, OSError)
 
 
 class DecodeRequest(BaseModel):
@@ -32,9 +39,19 @@ class ReplayControlRequest(BaseModel):
     speed: Literal[0.25, 0.5, 1.0, 2.0, 4.0] | None = None
 
 
+class TransmitRequest(BaseModel):
+    frame_hex: str = Field(min_length=1, max_length=512)
+    mode: Literal["auto", "logical", "fixed"] = "auto"
+    confirmed: bool = False
+
+
 @lru_cache(maxsize=1)
 def _service() -> WorkbenchService:
-    return WorkbenchService()
+    configured = os.environ.get("PACKET_PREDATOR_ADAPTER_PROFILE")
+    if not configured:
+        return WorkbenchService()
+    profile = load_nrf905_profile(Path(configured))
+    return WorkbenchService(carrier=open_nrf905_transport(profile))
 
 
 def _unavailable(exc: Exception) -> JSONResponse:
@@ -52,8 +69,8 @@ def _unavailable(exc: Exception) -> JSONResponse:
 
 app = FastAPI(
     title="Packet Predator",
-    description="Local, hardware-free packet inspection workbench",
-    version="0.1.0",
+    description="Local packet inspection, deterministic replay, and explicit physical-adapter workbench",
+    version="0.2.0",
 )
 
 
@@ -61,7 +78,7 @@ app = FastAPI(
 async def status():
     try:
         return _service().status()
-    except (AuthorityError, RecordingError, OSError) as exc:
+    except _CONFIGURATION_ERRORS as exc:
         return _unavailable(exc)
 
 
@@ -69,7 +86,7 @@ async def status():
 async def catalog():
     try:
         return _service().catalog()
-    except (AuthorityError, RecordingError, OSError) as exc:
+    except _CONFIGURATION_ERRORS as exc:
         return _unavailable(exc)
 
 
@@ -77,7 +94,7 @@ async def catalog():
 async def examples():
     try:
         return _service().examples()
-    except (AuthorityError, RecordingError, OSError) as exc:
+    except _CONFIGURATION_ERRORS as exc:
         return _unavailable(exc)
 
 
@@ -85,7 +102,7 @@ async def examples():
 async def inspect(request: DecodeRequest):
     try:
         service = _service()
-    except (AuthorityError, RecordingError, OSError) as exc:
+    except _CONFIGURATION_ERRORS as exc:
         return _unavailable(exc)
     try:
         return service.inspect(request.frame_hex, request.mode, request.origin)
@@ -99,7 +116,7 @@ async def inspect(request: DecodeRequest):
 async def journal():
     try:
         return _service().journal()
-    except (AuthorityError, RecordingError, OSError) as exc:
+    except _CONFIGURATION_ERRORS as exc:
         return _unavailable(exc)
 
 
@@ -107,7 +124,7 @@ async def journal():
 async def inspection(identifier: str):
     try:
         item = _service().inspection(identifier)
-    except (AuthorityError, RecordingError, OSError) as exc:
+    except _CONFIGURATION_ERRORS as exc:
         return _unavailable(exc)
     if item is None:
         return JSONResponse(
@@ -121,7 +138,7 @@ async def inspection(identifier: str):
 async def replays():
     try:
         return _service().replay_catalog()
-    except (AuthorityError, RecordingError, OSError) as exc:
+    except _CONFIGURATION_ERRORS as exc:
         return _unavailable(exc)
 
 
@@ -131,7 +148,7 @@ async def select_replay(request: ReplaySelectRequest):
         return _service().select_replay(request.recording_id)
     except (RecordingError, TransportError) as exc:
         return JSONResponse(status_code=422, content={"error": exc.as_dict()})
-    except (AuthorityError, OSError) as exc:
+    except _CONFIGURATION_ERRORS as exc:
         return _unavailable(exc)
 
 
@@ -141,7 +158,7 @@ async def control_replay(request: ReplayControlRequest):
         return _service().control_replay(request.action, request.speed)
     except (RecordingError, TransportError) as exc:
         return JSONResponse(status_code=422, content={"error": exc.as_dict()})
-    except (AuthorityError, OSError) as exc:
+    except _CONFIGURATION_ERRORS as exc:
         return _unavailable(exc)
 
 
@@ -151,8 +168,36 @@ async def replay_state():
         return _service().replay_state()
     except (RecordingError, TransportError) as exc:
         return JSONResponse(status_code=422, content={"error": exc.as_dict()})
-    except (AuthorityError, OSError) as exc:
+    except _CONFIGURATION_ERRORS as exc:
         return _unavailable(exc)
+
+
+@app.post("/api/carrier/poll")
+async def poll_carrier():
+    try:
+        service = _service()
+    except _CONFIGURATION_ERRORS as exc:
+        return _unavailable(exc)
+    try:
+        return service.poll_physical()
+    except (TransportError, Nrf905Error) as exc:
+        return JSONResponse(status_code=422, content={"error": exc.as_dict()})
+    except service.wire.codec_error as exc:
+        return JSONResponse(status_code=422, content={"error": exc.as_dict()})
+
+
+@app.post("/api/carrier/transmit")
+async def transmit(request: TransmitRequest):
+    try:
+        service = _service()
+    except _CONFIGURATION_ERRORS as exc:
+        return _unavailable(exc)
+    try:
+        return service.transmit(request.frame_hex, request.mode, request.confirmed)
+    except (InspectionError, TransportError, Nrf905Error) as exc:
+        return JSONResponse(status_code=422, content={"error": exc.as_dict()})
+    except service.wire.codec_error as exc:
+        return JSONResponse(status_code=422, content={"error": exc.as_dict()})
 
 
 static_root = Path(__file__).resolve().parents[1] / "workbench_web"

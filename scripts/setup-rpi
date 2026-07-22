@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$repo_root"
+
+python_command=${PYTHON:-python3}
+if [ ! -d .venv ]; then
+    "$python_command" -m venv .venv
+fi
+
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements-rpi.txt
+
+echo "Packet Predator Raspberry Pi environment is ready."
+echo "Enable SPI separately, copy config/nrf905-bench.example.json to a .local.json profile, then run the probe."

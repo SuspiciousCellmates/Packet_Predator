@@ -37,7 +37,7 @@ HARDWARE_IMPORT_ROOTS = {
     "spidev",
     "vcgencmd",
 }
-NONDETERMINISTIC_IMPORT_ROOTS = {"random"}
+HARDWARE_ADAPTER_SOURCES = {"packet_predator/adapters/nrf905_linux.py"}
 LOCAL_CONTRACT_MODULES = ("packet", "nodes.node")
 PROTOCOL_SYMBOLS = {
     "Packet",
@@ -67,15 +67,6 @@ QUARANTINED_UI_MARKERS = {
         "triggerSimAction('sabotage'",
     ),
 }
-SUPPORTED_SCOPE_MARKERS = (
-    "/api/game/",
-    "/api/sim/",
-    "/api/send",
-    "/api/spoof",
-    "/api/transmit",
-    "trigger-kill",
-    "trigger-sabotage",
-)
 REQUIRED_QUARANTINE_IDS = {
     "coordinator",
     "autonomous-simulation",
@@ -246,10 +237,12 @@ def collect_architecture_violations(root: Path, runtime_paths: Iterable[str] | N
                 violations.add(f"local-contract-import|{relative}|{module}")
             if relative.startswith("packet_predator/") and import_root in ARCHIVED_RUNTIME_IMPORT_ROOTS:
                 violations.add(f"supported-runtime-imports-archive|{relative}|{module}")
-            if relative.startswith("packet_predator/") and import_root in HARDWARE_IMPORT_ROOTS:
-                violations.add(f"hardware-dependency|{relative}|{module}")
-            if relative.startswith("packet_predator/") and import_root in NONDETERMINISTIC_IMPORT_ROOTS:
-                violations.add(f"nondeterministic-dependency|{relative}|{module}")
+            if (
+                relative.startswith("packet_predator/")
+                and import_root in HARDWARE_IMPORT_ROOTS
+                and relative not in HARDWARE_ADAPTER_SOURCES
+            ):
+                violations.add(f"hardware-outside-adapter|{relative}|{module}")
 
         for node in ast.walk(tree):
             if not isinstance(node, ast.ClassDef):
@@ -282,23 +275,6 @@ def collect_architecture_violations(root: Path, runtime_paths: Iterable[str] | N
         for marker in markers:
             if marker in content:
                 violations.add(f"quarantined-ui|{relative}|{marker}")
-
-    for directory in ("packet_predator", "workbench_web"):
-        base = root / directory
-        if not base.is_dir():
-            continue
-        for path in base.rglob("*"):
-            if (
-                not path.is_file()
-                or "__pycache__" in path.parts
-                or path.suffix not in {".py", ".js", ".html", ".css"}
-            ):
-                continue
-            relative = path.relative_to(root).as_posix()
-            content = path.read_text(encoding="utf-8")
-            for marker in SUPPORTED_SCOPE_MARKERS:
-                if marker in content:
-                    violations.add(f"supported-scope-marker|{relative}|{marker}")
 
     excluded_artifact_parts = {".git", ".venv", "__pycache__", "tests", "docs", ".foundation"}
     for path in root.rglob("*"):
@@ -392,6 +368,13 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
         "docs/adr/0001-foundation-runtime-freeze.md",
         "docs/adr/0003-begin-layered-workbench-runtime.md",
         "docs/adr/0004-begin-deterministic-replay.md",
+        "docs/adr/0005-begin-nrf905-physical-validation.md",
+        "docs/nrf905-two-pi-bench.md",
+        "config/nrf905-bench.example.json",
+        "requirements-rpi.txt",
+        "scripts/nrf905-diagnose",
+        "scripts/run-rpi",
+        "scripts/setup-rpi",
         ".foundation/milestone.json",
         ".foundation/runtime-baseline.json",
         ".foundation/runtime-freeze.sha256",
@@ -404,7 +387,7 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
     milestone = load_json(root / ".foundation/milestone.json")
     expected = {
         "active_lane": "Now",
-        "milestone_id": "deterministic-replay-fake-transport",
+        "milestone_id": "nrf905-physical-adapter-validation",
         "status": "active",
         "runtime_changes_allowed": True,
         "protocol_authority": "../Protocol_Contract",
@@ -418,21 +401,22 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
         raise GuardError("layered milestone must retain but supersede the all-runtime freeze")
     if (
         freeze.get("replacement_requires_adr") is not True
-        or freeze.get("replacement_adr") != "docs/adr/0004-begin-deterministic-replay.md"
+        or freeze.get("replacement_adr") != "docs/adr/0005-begin-nrf905-physical-validation.md"
         or freeze.get("legacy_files_remain_immutable") is not True
     ):
         raise GuardError("archived runtime preservation rule is invalid")
 
     baseline = load_json(root / milestone["runtime_baseline"])
     baseline_expected = {
-        "status": "active-deterministic-replay",
-        "milestone_id": "deterministic-replay-fake-transport",
+        "status": "active-nrf905-validation",
+        "milestone_id": "nrf905-physical-adapter-validation",
         "protocol_authority": "../Protocol_Contract",
         "supported_entrypoint": "packet_predator.web:app",
         "default_transport": "inspect-only",
         "replay_startup": "explicit-selection-only",
-        "packet_transmission_allowed": False,
-        "hardware_imports_allowed": False,
+        "physical_startup": "explicit-profile-only",
+        "packet_transmission_allowed": "explicit-profile-and-request-confirmation",
+        "hardware_imports_allowed": ["packet_predator/adapters/nrf905_linux.py"],
         "autonomous_actors_allowed": False,
     }
     baseline_wrong = {
@@ -442,8 +426,8 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
     }
     if baseline_wrong:
         raise GuardError(f"supported runtime baseline is invalid: {baseline_wrong}")
-    if baseline.get("available_transports") != ["inspect-only", "deterministic-replay"]:
-        raise GuardError("supported runtime baseline must keep replay explicit and inspect-only first")
+    if baseline.get("available_transports") != ["inspect-only", "deterministic-replay", "nrf905"]:
+        raise GuardError("supported runtime baseline must keep physical access explicit and inspect-only first")
     supported = baseline.get("supported_runtime")
     if not isinstance(supported, dict) or not supported:
         raise GuardError("supported runtime baseline needs a non-empty named path allow-list")
@@ -460,15 +444,15 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
         raise GuardError("supported runtime baseline does not preserve the archive manifest")
 
     roadmap = (root / "docs/roadmap.md").read_text(encoding="utf-8")
-    if "## Now — Deterministic replay and fake transport" not in roadmap or milestone["milestone_id"] not in roadmap:
+    if "## Now — nRF905 physical adapter validation" not in roadmap or milestone["milestone_id"] not in roadmap:
         raise GuardError("docs/roadmap.md does not identify the active Now milestone")
     ordered = [
         "Reference codec and cross-language conformance suite released as Protocol Contract `1.0.1`.",
         "`layered-local-workbench`: hardware-free browser inspector, explicit inspect-only carrier, and layered supported entrypoint reviewed and accepted.",
-        "## Now — Deterministic replay and fake transport",
-        "## Next — Physical adapter validation",
-        "1. Validate capture and transmission through one selected physical adapter.",
-        "2. Build Game Controller and Game Master Console as distinct deployed roles against the shared contract; a console platform or presentation components may be shared without sharing production capabilities.",
+        "`deterministic-replay-fake-transport`: finite recording replay, fake opaque-frame transport, exact clock controls, and capture provenance reviewed and accepted.",
+        "## Now — nRF905 physical adapter validation",
+        "## Next — Game applications",
+        "1. Build Game Controller and Game Master Console as distinct deployed roles against the shared contract; a console platform or presentation components may be shared without sharing production capabilities.",
     ]
     positions = [roadmap.find(text) for text in ordered]
     if any(position < 0 for position in positions) or positions != sorted(positions):

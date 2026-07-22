@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "two-pi-bench",
+  "adapter": "nrf905",
+  "spi": {
+    "device": "/dev/spidev0.0",
+    "speed_hz": 1000000
+  },
+  "gpio": {
+    "chip": "/dev/gpiochip0",
+    "pwr_up": 25,
+    "trx_ce": 24,
+    "tx_en": 23,
+    "carrier_detect": 5,
+    "address_match": 6,
+    "data_ready": 22
+  },
+  "radio": {
+    "band": 433,
+    "channel": 108,
+    "transmit_power_dbm": -10,
+    "receive_reduced_power": false,
+    "automatic_retransmit": false,
+    "address_hex": "A7C35E19",
+    "crystal_mhz": 16,
+    "crc_bits": 16,
+    "transmit_enabled": false
+  }
+}

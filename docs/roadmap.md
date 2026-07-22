@@ -9,24 +9,25 @@ Milestones are sequential. A later milestone cannot begin until the preceding mi
 - Smallest viable protocol v1 frozen as `1.0.0`.
 - Reference codec and cross-language conformance suite released as Protocol Contract `1.0.1`.
 - `layered-local-workbench`: hardware-free browser inspector, explicit inspect-only carrier, and layered supported entrypoint reviewed and accepted.
+- `deterministic-replay-fake-transport`: finite recording replay, fake opaque-frame transport, exact clock controls, and capture provenance reviewed and accepted.
 
-## Now — Deterministic replay and fake transport
+## Now — nRF905 physical adapter validation
 
-Milestone ID: `deterministic-replay-fake-transport` (active).
+Milestone ID: `nrf905-physical-adapter-validation` (active).
 
-- Add validated recording files containing only explicit, ordered frame references and timing.
-- Add a fake transport that moves opaque frames through the same receive boundary intended for later adapters.
-- Provide play, pause, step, reset, and controlled-speed operations with exact deterministic tests.
-- Journal each delivered frame with recording, direction, sequence, and scheduled-time provenance.
-- Make recording selection explicit; retain inspect-only startup and prohibit implicit fake actors.
-- Add no game state, policy, decisions, random behavior, node emulation, or packet transmission.
+- Add a fresh isolated nRF905 adapter; never import the archived v0 driver.
+- Load SPI, GPIO, RF, and transmit settings only from an explicit deployment profile.
+- Prove SPI/GPIO access and exact nRF905 configuration-register readback on each Raspberry Pi 5.
+- Transmit and capture exact 32-byte released contract examples from Pi A to Pi B and then Pi B to Pi A.
+- Decode and journal physical frames through the existing reference-codec and service boundary.
+- Retain inspect-only startup when no adapter profile is supplied; add no node emulation, automatic replies, game state, or policy.
 
-Exit requires exact clock-controlled replay tests, malformed-recording rejection tests, browser/API verification without hardware, both repository checks, a clean architecture scan, and human review.
+Exit requires passing fake-backend adapter tests, clear malformed-profile and timeout failures, exact register readback on both Pis, exact fixture delivery in both RF directions, both repository checks, and human review of the physical evidence.
 
-## Next — Physical adapter validation
+## Next — Game applications
 
-1. Validate capture and transmission through one selected physical adapter.
+1. Build Game Controller and Game Master Console as distinct deployed roles against the shared contract; a console platform or presentation components may be shared without sharing production capabilities.
 
 ## Later — Fixed order
 
-2. Build Game Controller and Game Master Console as distinct deployed roles against the shared contract; a console platform or presentation components may be shared without sharing production capabilities.
+- Validate additional transport adapters only when a concrete need justifies them.

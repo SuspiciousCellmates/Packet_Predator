@@ -5,6 +5,9 @@ const state = {
   current: null,
   replayTimer: null,
   replayBusy: false,
+  radioTimer: null,
+  radioBusy: false,
+  physical: null,
 };
 
 const elements = Object.fromEntries([
@@ -20,6 +23,9 @@ const elements = Object.fromEntries([
   "replayReset", "replayStep", "replayPlay", "replayPause", "replaySpeed", "replayProgress",
   "replayFrameCount", "replaySchedule",
   "captureContext", "captureDirection", "captureIdentity", "captureNote",
+  "modeEyebrow", "modeHeading", "modeDescription", "truthCard", "truthTitle", "truthDetail",
+  "radioCard", "radioProfile", "radioDevices", "radioFrequency", "radioChannel", "radioAddress",
+  "radioCrc", "radioActivity", "radioPins", "transmitConfirm", "transmitButton",
 ].map((id) => [id, document.getElementById(id)]));
 
 function escaped(value) {
@@ -147,8 +153,13 @@ function renderResult(item, shouldScroll = true) {
   elements.headerRoute.textContent = `${item.envelope.source} → ${item.envelope.destination}`;
   elements.captureContext.hidden = !item.capture;
   if (item.capture) {
-    elements.captureDirection.textContent = item.capture.direction === "received" ? "Into workbench" : "Recorded outbound";
-    elements.captureIdentity.textContent = `${item.capture.recording_id} · frame ${item.capture.sequence + 1} · T+${item.capture.scheduled_at_ms} ms`;
+    const physical = item.capture.transport === "nrf905";
+    elements.captureDirection.textContent = physical
+      ? (item.capture.direction === "received" ? "Received over nRF905" : "Transmitted over nRF905")
+      : (item.capture.direction === "received" ? "Into workbench" : "Recorded outbound");
+    elements.captureIdentity.textContent = physical
+      ? `${item.capture.profile_id} · radio frame ${item.capture.sequence + 1} · ${item.capture.observed_at_ms} ms after adapter start`
+      : `${item.capture.recording_id} · frame ${item.capture.sequence + 1} · T+${item.capture.scheduled_at_ms} ms`;
     elements.captureNote.textContent = item.capture.note;
   }
 
@@ -199,7 +210,7 @@ async function renderJournal() {
     elements.journalCard.hidden = result.count === 0;
     elements.journalList.innerHTML = result.entries.slice(0, 7).map((entry) => `
       <button class="journal-entry" type="button" data-inspection="${escaped(entry.id)}">
-        <div><strong>${escaped(entry.title)}</strong><small>${entry.capture ? `T+${entry.capture.scheduled_at_ms} ms · ${escaped(entry.capture.direction)} · ` : `${escaped(entry.origin)} · `}${escaped(entry.summary)}</small></div>
+        <div><strong>${escaped(entry.title)}</strong><small>${entry.capture ? `${entry.capture.transport === "nrf905" ? `${entry.capture.observed_at_ms} ms · RF` : `T+${entry.capture.scheduled_at_ms} ms`} · ${escaped(entry.capture.direction)} · ` : `${escaped(entry.origin)} · `}${escaped(entry.summary)}</small></div>
         <time datetime="${escaped(entry.observed_at)}">${new Date(entry.observed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
       </button>
     `).join("");
@@ -252,7 +263,7 @@ function renderReplayState(result) {
   elements.replayStep.disabled = carrier.state === "playing" || carrier.state === "complete";
   elements.replayReset.disabled = carrier.state === "ready" && carrier.cursor === 0;
   elements.replaySpeed.disabled = carrier.state === "complete";
-  elements.carrierStatus.innerHTML = `<i></i> ${escaped(carrier.label)} · ${escaped(carrier.state)} · no radio`;
+  elements.carrierStatus.innerHTML = `<i></i> ${escaped(carrier.label)} · ${escaped(carrier.state)} · ${state.physical ? "RF bench also listening" : "no radio"}`;
 
   elements.replaySchedule.innerHTML = recording.schedule.map((item) => {
     const statusClass = item.sequence < carrier.cursor ? "delivered" : item.sequence === carrier.cursor ? "next" : "pending";
@@ -335,6 +346,83 @@ function stopReplayPolling() {
   state.replayTimer = null;
 }
 
+function renderPhysicalStatus(carrier) {
+  state.physical = carrier;
+  const profile = carrier.profile;
+  elements.radioCard.hidden = false;
+  elements.modeEyebrow.textContent = "Physical adapter validation";
+  elements.modeHeading.textContent = "See the exact bytes that cross your radio bench.";
+  elements.modeDescription.textContent = "Packet Predator still validates every frame through the shared contract, while the configured nRF905 moves only complete 32-byte frames.";
+  elements.truthTitle.textContent = "Live nRF905";
+  elements.truthDetail.textContent = carrier.can_transmit ? "Receive and confirmed transmit are enabled." : "Listening only; transmit is disabled in the profile.";
+  elements.radioProfile.textContent = profile.id;
+  elements.radioDevices.textContent = `${profile.spi_device} · ${profile.gpio_chip}`;
+  elements.radioFrequency.textContent = `${profile.frequency_mhz.toFixed(1)} MHz`;
+  elements.radioChannel.textContent = `band ${profile.band} · channel ${profile.channel} · ${profile.transmit_power_dbm} dBm`;
+  elements.radioAddress.textContent = profile.physical_address_hex;
+  elements.radioCrc.textContent = `${profile.crc_bits}-bit hardware CRC`;
+  const pins = carrier.pins || {};
+  elements.radioPins.textContent = `CD ${Number(Boolean(pins.carrier_detect))} · AM ${Number(Boolean(pins.address_match))} · DR ${Number(Boolean(pins.data_ready))}`;
+  elements.transmitButton.disabled = !carrier.can_transmit;
+  elements.transmitConfirm.disabled = !carrier.can_transmit;
+  elements.carrierStatus.innerHTML = `<i></i> ${escaped(carrier.label)} · listening`;
+}
+
+async function pollRadio() {
+  if (state.radioBusy || !state.physical) return;
+  state.radioBusy = true;
+  try {
+    const result = await api("/api/carrier/poll", { method: "POST" });
+    renderPhysicalStatus(result.carrier);
+    if (result.delivered.length) {
+      elements.radioActivity.textContent = "Frame received";
+      renderResult(result.delivered[result.delivered.length - 1], false);
+    }
+  } catch (detail) {
+    stopRadioPolling();
+    showError(detail);
+  } finally {
+    state.radioBusy = false;
+  }
+}
+
+function startRadioPolling() {
+  if (!state.radioTimer) state.radioTimer = window.setInterval(pollRadio, 50);
+}
+
+function stopRadioPolling() {
+  if (state.radioTimer) window.clearInterval(state.radioTimer);
+  state.radioTimer = null;
+}
+
+async function transmitFrame() {
+  clearError();
+  if (!elements.transmitConfirm.checked) {
+    showError({ code: "TRANSMIT_CONFIRMATION_REQUIRED", message: "Tick the one-transmission confirmation first." });
+    return;
+  }
+  elements.transmitButton.disabled = true;
+  try {
+    const result = await api("/api/carrier/transmit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        frame_hex: elements.frameInput.value,
+        mode: elements.frameMode.value,
+        confirmed: true,
+      }),
+    });
+    elements.transmitConfirm.checked = false;
+    renderPhysicalStatus(result.carrier);
+    elements.radioActivity.textContent = "Frame transmitted";
+    renderResult(result.delivered[0], false);
+  } catch (detail) {
+    showError(detail);
+  } finally {
+    if (state.physical) elements.transmitButton.disabled = !state.physical.can_transmit;
+  }
+}
+
 function bindTabs() {
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -356,13 +444,17 @@ async function initialise() {
   bindTabs();
   try {
     const [status, examples, replays] = await Promise.all([api("/api/status"), api("/api/v1/examples"), api("/api/replays")]);
-    elements.carrierStatus.innerHTML = `<i></i> ${escaped(status.carrier.label)} · no radio`;
+    elements.carrierStatus.innerHTML = `<i></i> ${escaped(status.carrier.label)} · ${status.physical_adapter ? "listening" : "no radio"}`;
     elements.authorityStatus.textContent = `Contract ${status.authority.authority_version}`;
     elements.authorityStatus.classList.add("ready");
     state.examples = examples.examples;
     elements.exampleCount.textContent = `${examples.example_count} frames`;
     renderExamples();
     populateRecordings(replays);
+    if (status.physical_adapter) {
+      renderPhysicalStatus(status.physical_adapter);
+      startRadioPolling();
+    }
   } catch (detail) {
     elements.exampleList.innerHTML = '<div class="loading-block">The shared contract could not be loaded.</div>';
     elements.authorityStatus.textContent = "Contract unavailable";
@@ -385,6 +477,7 @@ elements.frameMode.addEventListener("change", () => {
   }
 });
 elements.inspectButton.addEventListener("click", inspectFrame);
+elements.transmitButton.addEventListener("click", transmitFrame);
 elements.recordingSelect.addEventListener("change", selectRecording);
 elements.replayPlay.addEventListener("click", () => replayAction("play", true));
 elements.replayPause.addEventListener("click", () => replayAction("pause"));
