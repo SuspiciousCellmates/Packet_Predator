@@ -102,6 +102,9 @@ class WireAdapter:
             item["value"]: item for item in self.registry_data.get("messages", [])
         }
         self.examples = list(self.example_data.get("fixtures", []))
+        self.examples_by_id = {item["id"]: item for item in self.examples}
+        if len(self.examples_by_id) != len(self.examples):
+            raise AuthorityError("Conformance example identifiers must be unique.")
 
     @property
     def version(self) -> str:
@@ -219,6 +222,41 @@ class WireAdapter:
             "annotations": decoded["annotations"],
             "field_rows": self._field_rows(definition, decoded),
             "byte_rows": self._byte_rows(raw, logical_size),
+        }
+
+    def resolve_example(
+        self,
+        identifier: str,
+        mode: str = "logical",
+        source: int | None = None,
+        destination: int | None = None,
+    ) -> dict[str, Any]:
+        item = self.examples_by_id.get(identifier)
+        if item is None:
+            raise InspectionError("EXAMPLE_NOT_FOUND", f"No released example is named {identifier!r}.")
+        if mode not in {"logical", "fixed"}:
+            raise InspectionError("EXAMPLE_MODE", "Recording examples must be logical or fixed frames.")
+
+        decoded = self.codec.decode_frame(bytes.fromhex(item["frame_hex"]), mode="logical")
+        resolved_source = decoded.source if source is None else source
+        resolved_destination = decoded.destination if destination is None else destination
+        raw = self.codec.encode_frame(
+            decoded.message_name,
+            resolved_source,
+            resolved_destination,
+            decoded.payload,
+            padded=mode == "fixed",
+        )
+        return {
+            "fixture_id": identifier,
+            "name": decoded.message_name,
+            "display_name": self._display_name(decoded.message_name),
+            "frame_hex": raw.hex(),
+            "frame_mode": mode,
+            "source": resolved_source,
+            "source_label": self._address_label(resolved_source, False),
+            "destination": resolved_destination,
+            "destination_label": self._address_label(resolved_destination, True),
         }
 
     def _field_rows(self, definition: dict[str, Any], decoded: dict[str, Any]) -> list[dict[str, Any]]:

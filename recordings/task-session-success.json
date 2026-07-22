@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "task-session-success",
+  "title": "Recorded task session",
+  "description": "A deliberate frame sequence connecting a Player scan, Task Node session, completion report, and controller recording confirmation.",
+  "authority_version": "1.0.1",
+  "frame_mode": "logical",
+  "duration_ms": 3400,
+  "entries": [
+    {"at_ms": 0, "fixture_id": "v1-scan-observation", "source": 3, "destination": 0, "direction": "received", "note": "Player endpoint 3 reports a scanned tag observation."},
+    {"at_ms": 350, "fixture_id": "v1-task-session-start", "source": 0, "destination": 7, "direction": "sent", "note": "The recorded exchange asks Task endpoint 7 to start session 1."},
+    {"at_ms": 700, "fixture_id": "v1-task-start-result", "source": 7, "destination": 0, "direction": "received", "note": "Task endpoint 7 reports the recorded session-start result."},
+    {"at_ms": 1000, "fixture_id": "v1-action-result", "source": 0, "destination": 3, "direction": "sent", "note": "Player endpoint 3 receives the recorded result for its scan."},
+    {"at_ms": 2100, "fixture_id": "v1-task-milestone", "source": 7, "destination": 0, "direction": "received", "note": "An opportunistic progress milestone appears in the capture."},
+    {"at_ms": 3050, "fixture_id": "v1-task-outcome", "source": 7, "destination": 0, "direction": "received", "note": "Task endpoint 7 reports its retained terminal outcome."},
+    {"at_ms": 3400, "fixture_id": "v1-task-outcome-recorded", "source": 0, "destination": 7, "direction": "sent", "note": "The recorded controller response confirms receipt of the outcome."}
+  ]
+}

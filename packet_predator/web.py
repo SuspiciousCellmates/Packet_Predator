@@ -12,6 +12,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .service import WorkbenchService
+from .replay import RecordingError
+from .transport import TransportError
 from .wire_adapter import AuthorityError, InspectionError
 
 
@@ -19,6 +21,15 @@ class DecodeRequest(BaseModel):
     frame_hex: str = Field(min_length=1, max_length=512)
     mode: Literal["auto", "logical", "fixed"] = "auto"
     origin: str = Field(default="pasted frame", max_length=120)
+
+
+class ReplaySelectRequest(BaseModel):
+    recording_id: str = Field(min_length=1, max_length=80, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+class ReplayControlRequest(BaseModel):
+    action: Literal["play", "pause", "step", "reset", "speed"]
+    speed: Literal[0.25, 0.5, 1.0, 2.0, 4.0] | None = None
 
 
 @lru_cache(maxsize=1)
@@ -31,9 +42,9 @@ def _unavailable(exc: Exception) -> JSONResponse:
         status_code=503,
         content={
             "error": {
-                "code": "AUTHORITY_UNAVAILABLE",
+                "code": "WORKBENCH_CONFIGURATION_UNAVAILABLE",
                 "message": str(exc),
-                "hint": "Keep Protocol_Contract beside Packet_Predator or set PACKET_PREDATOR_CONTRACT_ROOT.",
+                "hint": "Check the sibling Protocol_Contract and recordings, then run ./scripts/check.",
             }
         },
     )
@@ -50,7 +61,7 @@ app = FastAPI(
 async def status():
     try:
         return _service().status()
-    except (AuthorityError, OSError) as exc:
+    except (AuthorityError, RecordingError, OSError) as exc:
         return _unavailable(exc)
 
 
@@ -58,7 +69,7 @@ async def status():
 async def catalog():
     try:
         return _service().catalog()
-    except (AuthorityError, OSError) as exc:
+    except (AuthorityError, RecordingError, OSError) as exc:
         return _unavailable(exc)
 
 
@@ -66,7 +77,7 @@ async def catalog():
 async def examples():
     try:
         return _service().examples()
-    except (AuthorityError, OSError) as exc:
+    except (AuthorityError, RecordingError, OSError) as exc:
         return _unavailable(exc)
 
 
@@ -74,7 +85,7 @@ async def examples():
 async def inspect(request: DecodeRequest):
     try:
         service = _service()
-    except (AuthorityError, OSError) as exc:
+    except (AuthorityError, RecordingError, OSError) as exc:
         return _unavailable(exc)
     try:
         return service.inspect(request.frame_hex, request.mode, request.origin)
@@ -88,6 +99,58 @@ async def inspect(request: DecodeRequest):
 async def journal():
     try:
         return _service().journal()
+    except (AuthorityError, RecordingError, OSError) as exc:
+        return _unavailable(exc)
+
+
+@app.get("/api/inspections/{identifier}")
+async def inspection(identifier: str):
+    try:
+        item = _service().inspection(identifier)
+    except (AuthorityError, RecordingError, OSError) as exc:
+        return _unavailable(exc)
+    if item is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": {"code": "INSPECTION_NOT_FOUND", "message": "That inspection is no longer in the local journal."}},
+        )
+    return item
+
+
+@app.get("/api/replays")
+async def replays():
+    try:
+        return _service().replay_catalog()
+    except (AuthorityError, RecordingError, OSError) as exc:
+        return _unavailable(exc)
+
+
+@app.post("/api/replays/select")
+async def select_replay(request: ReplaySelectRequest):
+    try:
+        return _service().select_replay(request.recording_id)
+    except (RecordingError, TransportError) as exc:
+        return JSONResponse(status_code=422, content={"error": exc.as_dict()})
+    except (AuthorityError, OSError) as exc:
+        return _unavailable(exc)
+
+
+@app.post("/api/replays/control")
+async def control_replay(request: ReplayControlRequest):
+    try:
+        return _service().control_replay(request.action, request.speed)
+    except (RecordingError, TransportError) as exc:
+        return JSONResponse(status_code=422, content={"error": exc.as_dict()})
+    except (AuthorityError, OSError) as exc:
+        return _unavailable(exc)
+
+
+@app.get("/api/replays/state")
+async def replay_state():
+    try:
+        return _service().replay_state()
+    except (RecordingError, TransportError) as exc:
+        return JSONResponse(status_code=422, content={"error": exc.as_dict()})
     except (AuthorityError, OSError) as exc:
         return _unavailable(exc)
 

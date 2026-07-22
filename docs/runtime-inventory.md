@@ -7,8 +7,9 @@ The archived prototype files remain immutable evidence. The supported layered ru
 | Capability | Location | Boundary |
 |---|---|---|
 | v1 frame decode and fixture catalog | `packet_predator/wire_adapter.py` | Delegates to sibling Protocol Contract `1.0.1`; defines no shared values |
-| Hardware-free status | `packet_predator/transport.py` | Explicit inspect-only transport, never an implicit simulation fallback |
-| Inspection history | `packet_predator/service.py` | Process-local manual/fixture observations only; no game state |
+| Recording catalogue | `packet_predator/replay.py`, `recordings/` | Finite ordered fixture references with validated timing; no executable scenario behavior |
+| Hardware-free transports | `packet_predator/transport.py` | Inspect-only startup plus explicitly selected deterministic replay; neither transmits |
+| Inspection history | `packet_predator/service.py` | Process-local manual, fixture, and replay observations only; no game state |
 | JSON/static application | `packet_predator/web.py`, `workbench_web/` | Thin routes and browser presentation |
 
 ## Keep as archived workbench intent
@@ -27,10 +28,10 @@ The archived prototype files remain immutable evidence. The supported layered ru
 |---|---|
 | Local `PayloadType`, `EVENT_TYPES`, `NodeType`, settings, and layouts | Replaced in the supported entrypoint by the sibling reference codec; retained only as v0 evidence |
 | `RadioManager` global lifecycle and direct protocol knowledge | Excluded from the supported entrypoint; inspect-only transport boundary added, physical adapter deferred |
-| `driver/virtual_airwaves.py` | Deterministic fake/replay transport |
+| `driver/virtual_airwaves.py` | Replaced for supported use by the deterministic opaque-frame replay transport; legacy file retained as evidence |
 | Monolithic `web_app.py` | Replaced for supported use by wire adapter, transport, service, and thin web layers |
 | Implicit hardware-versus-simulation selection | Replaced by explicit visible inspect-only status; adapter selection remains later work |
-| Random simulation tests | Deterministic scenarios and replay fixtures |
+| Random simulation tests | Replaced for supported use by clock-controlled recording replay tests; legacy characterization tests remain quarantined evidence |
 
 ## Quarantine as unsupported Packet Predator functionality
 

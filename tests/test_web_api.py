@@ -3,6 +3,7 @@ import json
 import unittest
 from pathlib import Path
 
+from packet_predator import web
 from packet_predator.web import app
 
 
@@ -55,6 +56,9 @@ async def asgi_request(method: str, path: str, body: dict | None = None):
     "sibling Protocol Contract checkout is required for API integration tests",
 )
 class WebApiTests(unittest.TestCase):
+    def setUp(self):
+        web._service.cache_clear()
+
     def test_browser_index_is_served(self):
         status, headers, body = asyncio.run(asgi_request("GET", "/"))
         self.assertEqual(status, 200)
@@ -98,6 +102,50 @@ class WebApiTests(unittest.TestCase):
         result = json.loads(body)
         self.assertEqual(status, 422)
         self.assertEqual(result["error"]["code"], "FRAME_TOO_SHORT")
+
+    def test_recording_selection_and_step_deliver_one_inspectable_frame(self):
+        status, _, body = asyncio.run(asgi_request("GET", "/api/replays"))
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["count"], 3)
+
+        status, _, body = asyncio.run(
+            asgi_request("POST", "/api/replays/select", {"recording_id": "task-session-success"})
+        )
+        selected = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(selected["carrier"]["state"], "ready")
+        self.assertFalse(selected["carrier"]["can_transmit"])
+
+        status, _, body = asyncio.run(
+            asgi_request("POST", "/api/replays/control", {"action": "step"})
+        )
+        stepped = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(stepped["delivered"]), 1)
+        self.assertEqual(stepped["delivered"][0]["meaning"]["name"], "SCAN_OBSERVATION")
+        self.assertEqual(stepped["delivered"][0]["capture"]["scheduled_at_ms"], 0)
+
+        identifier = stepped["delivered"][0]["id"]
+        status, _, body = asyncio.run(asgi_request("GET", f"/api/inspections/{identifier}"))
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["id"], identifier)
+
+    def test_recording_play_is_explicit_and_never_transmits(self):
+        asyncio.run(
+            asgi_request("POST", "/api/replays/select", {"recording_id": "node-onboarding"})
+        )
+        status, _, body = asyncio.run(
+            asgi_request(
+                "POST",
+                "/api/replays/control",
+                {"action": "play", "speed": 4.0},
+            )
+        )
+        result = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(result["carrier"]["state"], "playing")
+        self.assertFalse(result["carrier"]["can_transmit"])
+        self.assertEqual([item["capture"]["sequence"] for item in result["delivered"]], [0])
 
 
 if __name__ == "__main__":

@@ -66,6 +66,34 @@ class FoundationGuardrailTests(unittest.TestCase):
                 violations,
             )
 
+    def test_supported_runtime_cannot_import_random_behavior(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            supported = root / "packet_predator"
+            supported.mkdir()
+            (supported / "replay.py").write_text("import random\n", encoding="utf-8")
+            violations = collect_architecture_violations(root, ["packet_predator/replay.py"])
+
+            self.assertIn(
+                "nondeterministic-dependency|packet_predator/replay.py|random",
+                violations,
+            )
+
+    def test_supported_browser_cannot_add_transmit_control(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            supported = root / "workbench_web"
+            supported.mkdir()
+            (supported / "app.js").write_text(
+                'fetch("/api/transmit")\n', encoding="utf-8"
+            )
+            violations = collect_architecture_violations(root, [])
+
+            self.assertIn(
+                "supported-scope-marker|workbench_web/app.js|/api/transmit",
+                violations,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "node-onboarding",
+  "title": "Node onboarding",
+  "description": "A fixed recording of one Player Node introducing itself and applying the initial state snapshot that follows.",
+  "authority_version": "1.0.1",
+  "frame_mode": "logical",
+  "duration_ms": 1500,
+  "entries": [
+    {"at_ms": 0, "fixture_id": "v1-node-hello", "source": 1, "destination": 0, "direction": "received", "note": "Endpoint 1 introduces its current boot and supported revisions."},
+    {"at_ms": 300, "fixture_id": "v1-hello-result", "source": 0, "destination": 1, "direction": "sent", "note": "The recorded controller reply says that the initial snapshot follows."},
+    {"at_ms": 700, "fixture_id": "v1-snapshot-begin", "source": 0, "destination": 1, "direction": "sent", "note": "The initial state snapshot begins."},
+    {"at_ms": 1100, "fixture_id": "v1-snapshot-record", "source": 0, "destination": 1, "direction": "sent", "note": "The snapshot carries one typed state record."},
+    {"at_ms": 1500, "fixture_id": "v1-state-applied", "source": 1, "destination": 0, "direction": "received", "note": "Endpoint 1 confirms the recorded snapshot application result."}
+  ]
+}

@@ -56,6 +56,64 @@
           </div>
         </div>
 
+        <section class="replay-card" aria-labelledby="replayHeading">
+          <div class="replay-topline">
+            <div>
+              <p class="eyebrow accent">Deterministic recording player</p>
+              <h3 id="replayHeading">Reproduce a packet exchange</h3>
+            </div>
+            <span class="no-actors"><i></i> Frames only · no actors</span>
+          </div>
+          <div class="replay-picker-row">
+            <label class="recording-picker">Recording
+              <select id="recordingSelect">
+                <option value="">Choose a recording…</option>
+              </select>
+            </label>
+            <p id="recordingDescription">Nothing runs until you deliberately choose a finite recording.</p>
+          </div>
+          <div class="replay-body" id="replayBody" hidden>
+            <div class="replay-dashboard">
+              <div class="transport-readout">
+                <small>Fake transport</small>
+                <strong id="replayStateLabel">Ready</strong>
+                <span id="replayPosition">0.00 / 0.00 seconds</span>
+              </div>
+              <div class="replay-controls" aria-label="Recording playback controls">
+                <button id="replayReset" class="icon-button" type="button" title="Reset recording" aria-label="Reset recording">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M5.5 15a7 7 0 1 0 .7-7.8L4 10"/></svg>
+                </button>
+                <button id="replayStep" class="secondary-button" type="button">
+                  Step
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 5 9 7-9 7V5Zm10 0v14"/></svg>
+                </button>
+                <button id="replayPlay" class="primary-button compact" type="button">
+                  Play
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg>
+                </button>
+                <button id="replayPause" class="secondary-button" type="button" hidden>
+                  Pause
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+                </button>
+                <label class="speed-picker">Speed
+                  <select id="replaySpeed">
+                    <option value="0.5">0.5×</option>
+                    <option value="1" selected>1×</option>
+                    <option value="2">2×</option>
+                    <option value="4">4×</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="progress-track" aria-hidden="true"><i id="replayProgress"></i></div>
+            <div class="replay-schedule-heading">
+              <span>Recorded timetable</span>
+              <small id="replayFrameCount">0 frames</small>
+            </div>
+            <ol class="replay-schedule" id="replaySchedule"></ol>
+          </div>
+        </section>
+
         <section class="input-card" aria-labelledby="inputHeading">
           <div class="card-heading">
             <div>
@@ -103,6 +161,11 @@
               <span id="messageValue">—</span>
               <span id="representation">—</span>
             </div>
+          </div>
+
+          <div class="capture-context" id="captureContext" hidden>
+            <span id="captureDirection">—</span>
+            <div><strong id="captureIdentity">—</strong><p id="captureNote">—</p></div>
           </div>
 
           <div class="route" aria-label="Frame route">

@@ -8,25 +8,25 @@ Milestones are sequential. A later milestone cannot begin until the preceding mi
 - Component/message inventory reviewed and approved in the sibling Protocol Contract repository.
 - Smallest viable protocol v1 frozen as `1.0.0`.
 - Reference codec and cross-language conformance suite released as Protocol Contract `1.0.1`.
+- `layered-local-workbench`: hardware-free browser inspector, explicit inspect-only carrier, and layered supported entrypoint reviewed and accepted.
 
-## Now — Layered local workbench
+## Now — Deterministic replay and fake transport
 
-Milestone ID: `layered-local-workbench` (active).
+Milestone ID: `deterministic-replay-fake-transport` (active).
 
-- Consume the sibling Protocol Contract reference codec without copying constants.
-- Separate wire interpretation, transport status, workbench service, and thin web concerns.
-- Provide a clear browser inspector that runs on an ordinary Linux laptop without radio hardware.
-- Browse exact fixtures, paste/decode logical or padded frames, and expose labelled fields plus raw bytes.
-- Keep the archived simulator, rules, map, and privileged game controls absent from the supported entrypoint.
-- Retain an explicit inspect-only transport boundary for later physical adapters.
+- Add validated recording files containing only explicit, ordered frame references and timing.
+- Add a fake transport that moves opaque frames through the same receive boundary intended for later adapters.
+- Provide play, pause, step, reset, and controlled-speed operations with exact deterministic tests.
+- Journal each delivered frame with recording, direction, sequence, and scheduled-time provenance.
+- Make recording selection explicit; retain inspect-only startup and prohibit implicit fake actors.
+- Add no game state, policy, decisions, random behavior, node emulation, or packet transmission.
 
-Exit requires the Packet Predator and Protocol Contract checks to pass, local browser/API verification without hardware, a clean architecture scan, and human review.
+Exit requires exact clock-controlled replay tests, malformed-recording rejection tests, browser/API verification without hardware, both repository checks, a clean architecture scan, and human review.
 
-## Next — Deterministic replay and fake transport
+## Next — Physical adapter validation
 
-1. Add explicit deterministic capture replay and a fake transport through the published transport interface. Do not restore autonomous game actors.
+1. Validate capture and transmission through one selected physical adapter.
 
 ## Later — Fixed order
 
-2. Validate capture and transmission through one selected physical adapter.
-3. Build Game Controller and Game Master Console as distinct deployed roles against the shared contract; a console platform or presentation components may be shared without sharing production capabilities.
+2. Build Game Controller and Game Master Console as distinct deployed roles against the shared contract; a console platform or presentation components may be shared without sharing production capabilities.

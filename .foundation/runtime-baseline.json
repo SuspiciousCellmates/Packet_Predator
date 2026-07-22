@@ -1,20 +1,26 @@
 {
   "schema_version": 1,
-  "status": "active-layered-workbench",
-  "milestone_id": "layered-local-workbench",
-  "replacement_adr": "docs/adr/0003-begin-layered-workbench-runtime.md",
+  "status": "active-deterministic-replay",
+  "milestone_id": "deterministic-replay-fake-transport",
+  "replacement_adr": "docs/adr/0004-begin-deterministic-replay.md",
   "protocol_authority": "../Protocol_Contract",
   "supported_entrypoint": "packet_predator.web:app",
   "supported_runtime": {
     "package": "packet_predator/__init__.py",
     "wire_adapter": "packet_predator/wire_adapter.py",
+    "replay_catalog": "packet_predator/replay.py",
     "transport": "packet_predator/transport.py",
     "service": "packet_predator/service.py",
     "web": "packet_predator/web.py",
-    "static_root": "workbench_web"
+    "static_root": "workbench_web",
+    "recording_root": "recordings"
   },
   "default_transport": "inspect-only",
+  "available_transports": ["inspect-only", "deterministic-replay"],
+  "replay_startup": "explicit-selection-only",
+  "packet_transmission_allowed": false,
   "hardware_imports_allowed": false,
+  "autonomous_actors_allowed": false,
   "legacy_archive": {
     "snapshot_tag": "packet-predator-v0-experimental",
     "manifest": ".foundation/runtime-freeze.sha256",

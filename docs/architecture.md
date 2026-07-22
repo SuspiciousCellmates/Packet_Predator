@@ -17,12 +17,13 @@ The archived runtime remains frozen as evidence by `.foundation/runtime-freeze.s
 | Layer | Location | Responsibility |
 |---|---|---|
 | Wire adapter | `packet_predator/wire_adapter.py` | Locate released Protocol Contract artifacts and expose decode/catalog/fixture operations without defining shared values |
-| Transport | `packet_predator/transport.py` | Report the explicitly selected carrier; initially inspect-only with no send/receive or hardware imports |
-| Workbench service | `packet_predator/service.py` | Turn fixture or pasted bytes into inspectable entries and process-local history |
+| Replay catalogue | `packet_predator/replay.py`, `recordings/` | Validate finite recording timetables and resolve released example references without game behavior |
+| Transport | `packet_predator/transport.py` | Publish the opaque-frame receive boundary; provide inspect-only and explicitly selected deterministic replay adapters |
+| Workbench service | `packet_predator/service.py` | Turn fixture, pasted, or replay-delivered bytes into inspectable entries and process-local history |
 | Thin web layer | `packet_predator/web.py` | Validate HTTP inputs, call the service, return JSON, and serve static files |
 | Browser UI | `workbench_web/` | Fixture browsing, search, summary, field/label inspection, validation feedback, and byte drill-down |
 
-Dependency direction is web → service → wire adapter, with transport status injected into the service. The wire adapter alone loads the sibling reference codec. The supported runtime imports none of the archived modules.
+Dependency direction is web → service → replay catalogue / transport / wire adapter. The replay catalogue resolves examples through an injected wire-adapter operation, then gives opaque frames to the transport. The transport never interprets them. The wire adapter alone loads the sibling reference codec. The supported runtime imports none of the archived modules.
 
 ## Target boundaries
 
@@ -47,8 +48,8 @@ Dependency direction is web → service → wire adapter, with transport status 
 - `web/`: retain packet-workbench views where useful; quarantine map and game controls.
 - `simulator.py`: quarantine completely; preserve in Git until deterministic scenario replacement exists elsewhere.
 
-## Active refactor constraint
+## Active replay constraint
 
-ADR 0003 and `.foundation/runtime-baseline.json` authorize the new layered runtime while retaining the old hash manifest as an archive-preservation check. This milestone does not authorize a physical adapter, deterministic scenario engine, Game Controller policy, or Game Master Console workflow.
+ADR 0004 and `.foundation/runtime-baseline.json` authorize finite deterministic recordings and an explicit fake transport while retaining the old hash manifest as an archive-preservation check. Recordings are data, not a scenario engine: they cannot branch, react, choose, infer responses, or model component state. This milestone does not authorize a physical adapter, Game Controller policy, node emulator, or Game Master Console workflow.
 
 Packet Predator may impersonate a Game Controller or another participant only in an isolated bench environment. For integration testing it should drive a real Game Controller through an intentional test interface. A future shared console platform does not merge these deployed roles: the production Game Master Console must lack raw-frame injection, endpoint impersonation, and direct-node access in its backend permissions and network reach, not merely hide those controls.

@@ -1,6 +1,6 @@
 # Laptop workbench
 
-Packet Predator's supported entrypoint is designed to be useful before any radio or Raspberry Pi is available. In its current inspect-only mode, the browser reads official Protocol Contract examples or hexadecimal text you supply. It cannot receive or transmit, and it does not silently substitute simulated players or tasks.
+Packet Predator's supported entrypoint is designed to be useful before any radio or Raspberry Pi is available. It starts in inspect-only mode, where the browser reads official Protocol Contract examples or hexadecimal text you supply. You may explicitly select a deterministic recording to feed a known sequence through the fake receive transport. Neither mode can transmit, and neither silently substitutes simulated players or tasks.
 
 ## First run
 
@@ -26,6 +26,10 @@ Then open [http://127.0.0.1:8000](http://127.0.0.1:8000). Stop the server with `
 ## What to try
 
 Select **Node hello** to see a node introduce itself to the Game Controller. The overview answers who sent it, where it went, and the delivery expectation. **Fields** shows readable enum or flag labels alongside the original numeric values and offsets. **Bytes** shows the four-byte envelope, body, and any zero padding separately.
+
+Alternatively, choose **Node onboarding**, **Recorded task session**, or **Retained outcome retry** in the recording player. **Step** releases exactly one scheduled frame. **Play** follows the recorded timetable, while pause, reset, and the speed selector let you examine the exchange at your own pace. The timetable marks which frames have been delivered, and clicking a recent journal row reopens its complete inspection.
+
+These recordings do not run a game. They have no conditions or virtual participants; Packet Predator merely releases the listed bytes in order. “Recorded outbound” means the capture says the frame travelled away from the workbench's viewpoint—it does not mean your laptop transmitted anything.
 
 Switch **Interpret as** to **Fixed 32-byte adapter frame** while an example is selected to inspect the exact padded form a fixed-width adapter may carry. Choosing **Logical frame** removes that carrier padding. The shared reference codec rejects malformed lengths, unknown values, illegal routes, and non-zero padding with a named, visible error.
 

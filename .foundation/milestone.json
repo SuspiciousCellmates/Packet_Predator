@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "active_lane": "Now",
-  "milestone_id": "layered-local-workbench",
+  "milestone_id": "deterministic-replay-fake-transport",
   "status": "active",
   "started": "2026-07-22",
-  "mission": "Provide a layered, hardware-free browser workbench that consumes the released protocol authority without importing quarantined game or simulator behavior.",
+  "mission": "Replay deliberate, repeatable frame recordings through an explicit fake transport without autonomous actors, game policy, or hardware.",
   "runtime_changes_allowed": true,
   "protocol_authority": "../Protocol_Contract",
   "runtime_baseline": ".foundation/runtime-baseline.json",
@@ -13,8 +13,8 @@
     "snapshot_tag": "packet-predator-v0-experimental",
     "manifest": ".foundation/runtime-freeze.sha256",
     "replacement_requires_adr": true,
-    "replacement_adr": "docs/adr/0003-begin-layered-workbench-runtime.md",
+    "replacement_adr": "docs/adr/0004-begin-deterministic-replay.md",
     "legacy_files_remain_immutable": true
   },
-  "next_milestone": "deterministic-replay-fake-transport"
+  "next_milestone": "physical-adapter-validation"
 }

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "retained-outcome-retry",
+  "title": "Retained outcome retry",
+  "description": "The same Task outcome appears twice before its recording confirmation, making duplicate delivery easy to inspect repeatably.",
+  "authority_version": "1.0.1",
+  "frame_mode": "fixed",
+  "duration_ms": 700,
+  "entries": [
+    {"at_ms": 0, "fixture_id": "v1-task-outcome", "source": 7, "destination": 0, "direction": "received", "note": "Task endpoint 7 supplies the retained outcome in a 32-byte adapter frame."},
+    {"at_ms": 300, "fixture_id": "v1-task-outcome", "source": 7, "destination": 0, "direction": "received", "note": "The byte-identical outcome is observed again before confirmation."},
+    {"at_ms": 700, "fixture_id": "v1-task-outcome-recorded", "source": 0, "destination": 7, "direction": "sent", "note": "The final recorded frame confirms receipt of the outcome."}
+  ]
+}

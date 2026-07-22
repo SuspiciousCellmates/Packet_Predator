@@ -1,7 +1,10 @@
 const state = {
   examples: [],
+  recordings: [],
   selectedId: null,
   current: null,
+  replayTimer: null,
+  replayBusy: false,
 };
 
 const elements = Object.fromEntries([
@@ -13,6 +16,10 @@ const elements = Object.fromEntries([
   "logicalSize", "fieldCount", "resultByteCount", "deliveryLabel", "deliveryRaw",
   "revisionLabel", "producerList", "consumerList", "fieldTable", "byteStrip",
   "wireGeneration", "bodyLength", "headerMessageType", "headerRoute", "journalCard", "journalList",
+  "recordingSelect", "recordingDescription", "replayBody", "replayStateLabel", "replayPosition",
+  "replayReset", "replayStep", "replayPlay", "replayPause", "replaySpeed", "replayProgress",
+  "replayFrameCount", "replaySchedule",
+  "captureContext", "captureDirection", "captureIdentity", "captureNote",
 ].map((id) => [id, document.getElementById(id)]));
 
 function escaped(value) {
@@ -113,7 +120,7 @@ function annotationText(annotation) {
   return '<span class="meaning-chip">Annotated</span>';
 }
 
-function renderResult(item) {
+function renderResult(item, shouldScroll = true) {
   state.current = item;
   elements.emptyState.hidden = true;
   elements.resultPanel.hidden = false;
@@ -138,6 +145,12 @@ function renderResult(item) {
   elements.bodyLength.textContent = `${item.envelope.payload_length} bytes`;
   elements.headerMessageType.textContent = `${item.envelope.message_type_hex} / ${item.envelope.message_type}`;
   elements.headerRoute.textContent = `${item.envelope.source} → ${item.envelope.destination}`;
+  elements.captureContext.hidden = !item.capture;
+  if (item.capture) {
+    elements.captureDirection.textContent = item.capture.direction === "received" ? "Into workbench" : "Recorded outbound";
+    elements.captureIdentity.textContent = `${item.capture.recording_id} · frame ${item.capture.sequence + 1} · T+${item.capture.scheduled_at_ms} ms`;
+    elements.captureNote.textContent = item.capture.note;
+  }
 
   elements.fieldTable.innerHTML = item.field_rows.map((row) => `
     <tr>
@@ -154,7 +167,7 @@ function renderResult(item) {
     </div>
   `).join("");
   renderJournal();
-  elements.resultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (shouldScroll) elements.resultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 async function inspectFrame() {
@@ -184,15 +197,142 @@ async function renderJournal() {
   try {
     const result = await api("/api/inspections");
     elements.journalCard.hidden = result.count === 0;
-    elements.journalList.innerHTML = result.entries.slice(0, 5).map((entry) => `
-      <div class="journal-entry">
-        <div><strong>${escaped(entry.title)}</strong><small>${escaped(entry.origin)} · ${escaped(entry.summary)}</small></div>
+    elements.journalList.innerHTML = result.entries.slice(0, 7).map((entry) => `
+      <button class="journal-entry" type="button" data-inspection="${escaped(entry.id)}">
+        <div><strong>${escaped(entry.title)}</strong><small>${entry.capture ? `T+${entry.capture.scheduled_at_ms} ms · ${escaped(entry.capture.direction)} · ` : `${escaped(entry.origin)} · `}${escaped(entry.summary)}</small></div>
         <time datetime="${escaped(entry.observed_at)}">${new Date(entry.observed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
-      </div>
+      </button>
     `).join("");
+    elements.journalList.querySelectorAll("[data-inspection]").forEach((button) => {
+      button.addEventListener("click", () => openInspection(button.dataset.inspection));
+    });
   } catch (_) {
     elements.journalCard.hidden = true;
   }
+}
+
+async function openInspection(id) {
+  try {
+    const item = await api(`/api/inspections/${encodeURIComponent(id)}`);
+    renderResult(item);
+  } catch (detail) {
+    showError(detail);
+  }
+}
+
+function populateRecordings(result) {
+  state.recordings = result.recordings;
+  elements.recordingSelect.innerHTML = '<option value="">Choose a recording…</option>' + result.recordings.map((item) =>
+    `<option value="${escaped(item.id)}">${escaped(item.title)} · ${item.frame_count} frames</option>`
+  ).join("");
+  if (result.active) {
+    elements.recordingSelect.value = result.active.id;
+    renderReplayState({ recording: result.active, carrier: result.carrier, delivered: [] });
+  }
+}
+
+function formatSeconds(milliseconds) {
+  return (milliseconds / 1000).toFixed(2);
+}
+
+function renderReplayState(result) {
+  const carrier = result.carrier;
+  const recording = result.recording || state.recordings.find((item) => item.id === carrier.recording_id);
+  if (!recording) return;
+  elements.replayBody.hidden = false;
+  elements.recordingDescription.textContent = recording.description;
+  elements.replayStateLabel.textContent = prettyRole(carrier.state);
+  elements.replayPosition.textContent = `${formatSeconds(carrier.position_ms)} / ${formatSeconds(carrier.duration_ms)} seconds · ${carrier.cursor} of ${carrier.frame_count} frames`;
+  elements.replayFrameCount.textContent = `${recording.frame_count} frame${recording.frame_count === 1 ? "" : "s"}`;
+  elements.replayProgress.style.width = `${carrier.duration_ms ? Math.min(100, (carrier.position_ms / carrier.duration_ms) * 100) : 0}%`;
+  elements.replaySpeed.value = String(carrier.speed);
+  elements.replayPlay.hidden = carrier.state === "playing";
+  elements.replayPause.hidden = carrier.state !== "playing";
+  elements.replayPlay.disabled = carrier.state === "complete";
+  elements.replayStep.disabled = carrier.state === "playing" || carrier.state === "complete";
+  elements.replayReset.disabled = carrier.state === "ready" && carrier.cursor === 0;
+  elements.replaySpeed.disabled = carrier.state === "complete";
+  elements.carrierStatus.innerHTML = `<i></i> ${escaped(carrier.label)} · ${escaped(carrier.state)} · no radio`;
+
+  elements.replaySchedule.innerHTML = recording.schedule.map((item) => {
+    const statusClass = item.sequence < carrier.cursor ? "delivered" : item.sequence === carrier.cursor ? "next" : "pending";
+    const arrow = item.direction === "received" ? "↓" : "↑";
+    const directionLabel = item.direction === "received" ? "Into workbench" : "Recorded outbound";
+    return `
+      <li class="schedule-item ${escaped(item.direction)} ${statusClass}" data-sequence="${item.sequence}">
+        <time>T+${item.at_ms} ms</time>
+        <span class="schedule-direction" title="${directionLabel}">${arrow}</span>
+        <span class="schedule-kind"><strong>${escaped(item.display_name)}</strong><small>${escaped(item.source_label)} → ${escaped(item.destination_label)}</small></span>
+        <span class="schedule-note"><strong>${escaped(item.note)}</strong><small>${escaped(directionLabel)} · ${escaped(item.fixture_id)}</small></span>
+      </li>`;
+  }).join("");
+
+  if (result.delivered && result.delivered.length) {
+    renderResult(result.delivered[result.delivered.length - 1], false);
+    const current = elements.replaySchedule.querySelector(`[data-sequence="${result.delivered[result.delivered.length - 1].capture.sequence}"]`);
+    if (current) current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+  if (carrier.state === "playing") startReplayPolling();
+  else stopReplayPolling();
+}
+
+async function selectRecording() {
+  const identifier = elements.recordingSelect.value;
+  if (!identifier) return;
+  clearError();
+  stopReplayPolling();
+  try {
+    const result = await api("/api/replays/select", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recording_id: identifier }),
+    });
+    renderReplayState(result);
+  } catch (detail) {
+    showError(detail);
+  }
+}
+
+async function replayAction(action, includeSpeed = false) {
+  if (state.replayBusy) return;
+  state.replayBusy = true;
+  clearError();
+  try {
+    const body = { action };
+    if (includeSpeed) body.speed = Number(elements.replaySpeed.value);
+    const result = await api("/api/replays/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    renderReplayState(result);
+  } catch (detail) {
+    showError(detail);
+  } finally {
+    state.replayBusy = false;
+  }
+}
+
+async function pollReplay() {
+  if (state.replayBusy) return;
+  state.replayBusy = true;
+  try {
+    renderReplayState(await api("/api/replays/state"));
+  } catch (detail) {
+    stopReplayPolling();
+    showError(detail);
+  } finally {
+    state.replayBusy = false;
+  }
+}
+
+function startReplayPolling() {
+  if (!state.replayTimer) state.replayTimer = window.setInterval(pollReplay, 100);
+}
+
+function stopReplayPolling() {
+  if (state.replayTimer) window.clearInterval(state.replayTimer);
+  state.replayTimer = null;
 }
 
 function bindTabs() {
@@ -215,13 +355,14 @@ function bindTabs() {
 async function initialise() {
   bindTabs();
   try {
-    const [status, examples] = await Promise.all([api("/api/status"), api("/api/v1/examples")]);
+    const [status, examples, replays] = await Promise.all([api("/api/status"), api("/api/v1/examples"), api("/api/replays")]);
     elements.carrierStatus.innerHTML = `<i></i> ${escaped(status.carrier.label)} · no radio`;
     elements.authorityStatus.textContent = `Contract ${status.authority.authority_version}`;
     elements.authorityStatus.classList.add("ready");
     state.examples = examples.examples;
     elements.exampleCount.textContent = `${examples.example_count} frames`;
     renderExamples();
+    populateRecordings(replays);
   } catch (detail) {
     elements.exampleList.innerHTML = '<div class="loading-block">The shared contract could not be loaded.</div>';
     elements.authorityStatus.textContent = "Contract unavailable";
@@ -244,6 +385,12 @@ elements.frameMode.addEventListener("change", () => {
   }
 });
 elements.inspectButton.addEventListener("click", inspectFrame);
+elements.recordingSelect.addEventListener("change", selectRecording);
+elements.replayPlay.addEventListener("click", () => replayAction("play", true));
+elements.replayPause.addEventListener("click", () => replayAction("pause"));
+elements.replayStep.addEventListener("click", () => replayAction("step"));
+elements.replayReset.addEventListener("click", () => replayAction("reset"));
+elements.replaySpeed.addEventListener("change", () => replayAction("speed", true));
 elements.frameInput.addEventListener("keydown", (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === "Enter") inspectFrame();
 });

@@ -77,6 +77,8 @@ class BrowserAssetTests(unittest.TestCase):
         for phrase in (
             "Hardware-free inspection",
             "No live carrier",
+            "Deterministic recording player",
+            "Frames only · no actors",
             "Example frames",
             "Overview",
             "Fields",
@@ -90,6 +92,24 @@ class BrowserAssetTests(unittest.TestCase):
             content = path.read_text(encoding="utf-8")
             for name in forbidden:
                 self.assertNotIn(f"import {name}", content, f"{path.name} imports {name}")
+
+    def test_supported_runtime_does_not_use_random_behavior(self):
+        for path in (REPO_ROOT / "packet_predator").glob("*.py"):
+            self.assertNotIn("import random", path.read_text(encoding="utf-8"))
+
+    def test_recording_player_controls_are_present_in_browser_surface(self):
+        html = (REPO_ROOT / "workbench_web/index.html").read_text(encoding="utf-8")
+        for identifier in (
+            "recordingSelect",
+            "replayReset",
+            "replayStep",
+            "replayPlay",
+            "replayPause",
+            "replaySpeed",
+            "replaySchedule",
+            "captureContext",
+        ):
+            self.assertIn(f'id="{identifier}"', html)
 
 
 if __name__ == "__main__":
