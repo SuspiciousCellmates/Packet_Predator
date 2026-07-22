@@ -1,8 +1,17 @@
 # Runtime inventory
 
-Classification describes architectural intent, not work authorized during foundation. Every listed runtime file remains frozen.
+The archived prototype files remain immutable evidence. The supported layered runtime is separately authorized by ADR 0003.
 
-## Keep as workbench intent
+## Supported now
+
+| Capability | Location | Boundary |
+|---|---|---|
+| v1 frame decode and fixture catalog | `packet_predator/wire_adapter.py` | Delegates to sibling Protocol Contract `1.0.1`; defines no shared values |
+| Hardware-free status | `packet_predator/transport.py` | Explicit inspect-only transport, never an implicit simulation fallback |
+| Inspection history | `packet_predator/service.py` | Process-local manual/fixture observations only; no game state |
+| JSON/static application | `packet_predator/web.py`, `workbench_web/` | Thin routes and browser presentation |
+
+## Keep as archived workbench intent
 
 | Capability | Current location | Qualification |
 |---|---|---|
@@ -12,15 +21,15 @@ Classification describes architectural intent, not work authorized during founda
 | Radio configuration/diagnostics | `/api/config`, `driver/nrf905.py` | Keep only as experimental adapter tooling |
 | Exact packet characterization tests | `tests/test_packet_protocol.py`, `tests/test_v0_characterization.py` | Keep until superseded by cross-language conformance fixtures |
 
-## Replace in ordered milestones
+## Replacement progress and later work
 
 | Capability/module | Replacement direction |
 |---|---|
-| Local `PayloadType`, `EVENT_TYPES`, `NodeType`, settings, and layouts | Released shared contract binding/reference codec after v1 |
-| `RadioManager` global lifecycle and direct protocol knowledge | Explicit transport interface plus workbench service |
+| Local `PayloadType`, `EVENT_TYPES`, `NodeType`, settings, and layouts | Replaced in the supported entrypoint by the sibling reference codec; retained only as v0 evidence |
+| `RadioManager` global lifecycle and direct protocol knowledge | Excluded from the supported entrypoint; inspect-only transport boundary added, physical adapter deferred |
 | `driver/virtual_airwaves.py` | Deterministic fake/replay transport |
-| Monolithic `web_app.py` | Protocol, transport, service, and thin web layers |
-| Implicit hardware-versus-simulation selection | Explicit adapter selection with visible status |
+| Monolithic `web_app.py` | Replaced for supported use by wire adapter, transport, service, and thin web layers |
+| Implicit hardware-versus-simulation selection | Replaced by explicit visible inspect-only status; adapter selection remains later work |
 | Random simulation tests | Deterministic scenarios and replay fixtures |
 
 ## Quarantine as unsupported Packet Predator functionality

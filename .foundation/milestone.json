@@ -1,18 +1,20 @@
 {
   "schema_version": 1,
   "active_lane": "Now",
-  "milestone_id": "foundation-protocol-workbench",
+  "milestone_id": "layered-local-workbench",
   "status": "active",
-  "started": "2026-07-20",
-  "mission": "Preserve the prototype, establish shared protocol ownership, document boundaries, and enforce scope without runtime changes.",
-  "runtime_changes_allowed": false,
+  "started": "2026-07-22",
+  "mission": "Provide a layered, hardware-free browser workbench that consumes the released protocol authority without importing quarantined game or simulator behavior.",
+  "runtime_changes_allowed": true,
   "protocol_authority": "../Protocol_Contract",
+  "runtime_baseline": ".foundation/runtime-baseline.json",
   "runtime_freeze": {
-    "enforced": true,
+    "enforced": false,
     "snapshot_tag": "packet-predator-v0-experimental",
     "manifest": ".foundation/runtime-freeze.sha256",
     "replacement_requires_adr": true,
-    "replacement_adr": null
+    "replacement_adr": "docs/adr/0003-begin-layered-workbench-runtime.md",
+    "legacy_files_remain_immutable": true
   },
-  "next_milestone": "component-message-inventory-review"
+  "next_milestone": "deterministic-replay-fake-transport"
 }

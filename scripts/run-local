@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$repo_root"
+
+if [ -x .venv/bin/python ]; then
+    python_command=.venv/bin/python
+else
+    python_command=python3
+fi
+
+if ! "$python_command" -c 'import fastapi, uvicorn' 2>/dev/null; then
+    echo "Laptop dependencies are missing. Run ./scripts/setup-local first." >&2
+    exit 1
+fi
+
+server_host=${PACKET_PREDATOR_HOST:-127.0.0.1}
+server_port=${PACKET_PREDATOR_PORT:-8000}
+
+echo "Packet Predator is starting in inspect-only mode."
+echo "Open http://${server_host}:${server_port}"
+exec "$python_command" -m uvicorn packet_predator.web:app --host "$server_host" --port "$server_port"

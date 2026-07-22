@@ -36,6 +36,36 @@ class FoundationGuardrailTests(unittest.TestCase):
             with self.assertRaisesRegex(GuardError, "new architecture violations"):
                 compare_architecture(violations, set())
 
+    def test_supported_runtime_cannot_import_archived_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            supported = root / "packet_predator"
+            supported.mkdir()
+            (supported / "service.py").write_text("from driver.nrf905 import NRF905\n", encoding="utf-8")
+            violations = collect_architecture_violations(
+                root, ["packet_predator/service.py"]
+            )
+
+            self.assertIn(
+                "supported-runtime-imports-archive|packet_predator/service.py|driver.nrf905",
+                violations,
+            )
+
+    def test_supported_runtime_cannot_import_hardware_dependency(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            supported = root / "packet_predator"
+            supported.mkdir()
+            (supported / "transport.py").write_text("import spidev\n", encoding="utf-8")
+            violations = collect_architecture_violations(
+                root, ["packet_predator/transport.py"]
+            )
+
+            self.assertIn(
+                "hardware-dependency|packet_predator/transport.py|spidev",
+                violations,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

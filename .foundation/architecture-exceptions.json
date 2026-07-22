@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "status": "baseline-only-not-approved-design",
-  "policy": "These exact findings preserve the archived prototype during foundation. They may not be copied, extended, or used as precedent.",
+  "status": "archived-legacy-only",
+  "policy": "These exact findings apply only to immutable archived prototype files. The supported layered runtime may not import, copy, extend, or use them as precedent.",
   "exceptions": [
     {"id": "forbidden-dependency|web_app.py|simulator", "reason": "The monolithic web prototype starts autonomous simulation; this dependency is quarantined."},
 

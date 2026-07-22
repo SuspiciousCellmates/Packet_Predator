@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$repo_root"
+
+python_command=${PYTHON:-python3}
+if [ ! -d .venv ]; then
+    "$python_command" -m venv .venv
+fi
+
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements-local.txt
+
+echo "Packet Predator laptop environment is ready."
+echo "Start it with ./scripts/run-local"

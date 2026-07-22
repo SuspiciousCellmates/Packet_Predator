@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "status": "active-layered-workbench",
+  "milestone_id": "layered-local-workbench",
+  "replacement_adr": "docs/adr/0003-begin-layered-workbench-runtime.md",
+  "protocol_authority": "../Protocol_Contract",
+  "supported_entrypoint": "packet_predator.web:app",
+  "supported_runtime": {
+    "package": "packet_predator/__init__.py",
+    "wire_adapter": "packet_predator/wire_adapter.py",
+    "transport": "packet_predator/transport.py",
+    "service": "packet_predator/service.py",
+    "web": "packet_predator/web.py",
+    "static_root": "workbench_web"
+  },
+  "default_transport": "inspect-only",
+  "hardware_imports_allowed": false,
+  "legacy_archive": {
+    "snapshot_tag": "packet-predator-v0-experimental",
+    "manifest": ".foundation/runtime-freeze.sha256",
+    "policy": "immutable-unsupported-evidence"
+  }
+}

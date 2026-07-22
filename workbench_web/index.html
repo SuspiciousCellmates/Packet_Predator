@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Packet Predator local frame inspection workbench">
+  <title>Packet Predator · Local Workbench</title>
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Packet Predator home">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>
+          <strong>Packet Predator</strong>
+          <small>Protocol workbench</small>
+        </span>
+      </a>
+      <div class="status-line" aria-live="polite">
+        <span class="status-pill neutral" id="carrierStatus"><i></i> Checking local mode</span>
+        <span class="status-pill" id="authorityStatus">Contract —</span>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="library" aria-label="Example frame library">
+        <div class="library-heading">
+          <p class="eyebrow">Conformance library</p>
+          <div class="heading-row">
+            <h1>Example frames</h1>
+            <span id="exampleCount">—</span>
+          </div>
+          <p>Known-good frames from the shared contract. Choose one to see how it travels and what it means.</p>
+        </div>
+        <label class="search-box">
+          <span class="sr-only">Search examples</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
+          <input id="exampleSearch" type="search" placeholder="Search name or family" autocomplete="off">
+        </label>
+        <nav id="exampleList" class="example-list" aria-label="Available example frames">
+          <div class="loading-block">Loading examples…</div>
+        </nav>
+      </aside>
+
+      <section class="inspector">
+        <div class="intro">
+          <div>
+            <p class="eyebrow accent">Hardware-free inspection</p>
+            <h2>Understand a frame before touching a radio.</h2>
+            <p>Pick a real example or paste hexadecimal bytes. Packet Predator checks them with the shared reference codec, then explains the route, meaning, and exact layout.</p>
+          </div>
+          <div class="truth-card">
+            <span class="truth-icon" aria-hidden="true">⌁</span>
+            <div><strong>No live carrier</strong><small>Nothing here sends to a node.</small></div>
+          </div>
+        </div>
+
+        <section class="input-card" aria-labelledby="inputHeading">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">Frame input</p>
+              <h3 id="inputHeading">Paste bytes or use an example</h3>
+            </div>
+            <span class="byte-count" id="inputByteCount">0 bytes</span>
+          </div>
+          <label class="hex-field">
+            <span class="sr-only">Hexadecimal frame</span>
+            <textarea id="frameInput" rows="3" spellcheck="false" placeholder="For example: 46 07 00 01 01 00 E8 03 00 00"></textarea>
+          </label>
+          <div class="input-actions">
+            <label class="mode-field">Interpret as
+              <select id="frameMode">
+                <option value="auto">Detect logical or 32-byte frame</option>
+                <option value="logical">Logical frame</option>
+                <option value="fixed">Fixed 32-byte adapter frame</option>
+              </select>
+            </label>
+            <button class="primary-button" id="inspectButton" type="button">
+              Inspect frame
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14 0m-6-6 6 6-6 6"/></svg>
+            </button>
+          </div>
+          <div class="error-panel" id="errorPanel" role="alert" hidden>
+            <span>!</span><div><strong id="errorCode">Could not inspect frame</strong><p id="errorMessage"></p></div>
+          </div>
+        </section>
+
+        <section class="empty-state" id="emptyState">
+          <div class="radar" aria-hidden="true"><span></span></div>
+          <h3>Choose your first frame</h3>
+          <p>Try <button class="inline-action" id="starterExample" type="button">Node hello</button> to see a node introduce itself to the Game Controller.</p>
+        </section>
+
+        <section class="result" id="resultPanel" hidden aria-live="polite">
+          <div class="result-hero">
+            <div>
+              <p class="eyebrow accent" id="resultFamily">—</p>
+              <h2 id="resultTitle">—</h2>
+              <p class="result-summary" id="resultSummary">—</p>
+            </div>
+            <div class="result-badges">
+              <span id="messageValue">—</span>
+              <span id="representation">—</span>
+            </div>
+          </div>
+
+          <div class="route" aria-label="Frame route">
+            <div class="route-end">
+              <small>From</small><strong id="routeSource">—</strong><span id="routeSourceValue">—</span>
+            </div>
+            <div class="route-path"><i></i><span id="logicalSize">—</span><i></i></div>
+            <div class="route-end destination">
+              <small>To</small><strong id="routeDestination">—</strong><span id="routeDestinationValue">—</span>
+            </div>
+          </div>
+
+          <div class="tab-bar" role="tablist" aria-label="Inspection detail">
+            <button class="tab active" role="tab" aria-selected="true" data-tab="overview">Overview</button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="fields">Fields <span id="fieldCount">0</span></button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="bytes">Bytes <span id="resultByteCount">0</span></button>
+          </div>
+
+          <div class="tab-panel active" id="tab-overview" role="tabpanel">
+            <div class="detail-grid">
+              <article class="detail-card">
+                <p class="eyebrow">Delivery expectation</p>
+                <strong id="deliveryLabel">—</strong>
+                <p id="deliveryRaw">—</p>
+              </article>
+              <article class="detail-card">
+                <p class="eyebrow">Revision scope</p>
+                <strong id="revisionLabel">—</strong>
+                <p>Interpreted by the released contract shown above.</p>
+              </article>
+              <article class="detail-card wide">
+                <div><p class="eyebrow">Allowed senders</p><strong id="producerList">—</strong></div>
+                <div><p class="eyebrow">Expected readers</p><strong id="consumerList">—</strong></div>
+              </article>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="tab-fields" role="tabpanel" hidden>
+            <div class="field-note"><span>i</span> Labels are for readability; numeric values and byte offsets remain visible for verification.</div>
+            <div class="envelope-grid" aria-label="Envelope fields">
+              <div><small>Wire generation</small><strong id="wireGeneration">—</strong><span>upper 2 bits · byte 0</span></div>
+              <div><small>Body length</small><strong id="bodyLength">—</strong><span>lower 6 bits · byte 0</span></div>
+              <div><small>Message type</small><strong id="headerMessageType">—</strong><span>byte 1</span></div>
+              <div><small>Route</small><strong id="headerRoute">—</strong><span>bytes 2–3</span></div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Field</th><th>Meaning</th><th>Value</th><th>Wire bytes</th><th>Offset</th></tr></thead>
+                <tbody id="fieldTable"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="tab-bytes" role="tabpanel" hidden>
+            <div class="byte-legend">
+              <span><i class="envelope-key"></i> Envelope</span>
+              <span><i class="body-key"></i> Body</span>
+              <span><i class="padding-key"></i> Adapter padding</span>
+            </div>
+            <div class="byte-strip" id="byteStrip"></div>
+            <p class="byte-help">Byte numbers begin at zero. Hover or focus a byte to see its decimal value and role.</p>
+          </div>
+        </section>
+
+        <section class="journal-card" id="journalCard" hidden>
+          <div class="card-heading"><div><p class="eyebrow">This session</p><h3>Recently inspected</h3></div><small>Clears when the server stops</small></div>
+          <div class="journal-list" id="journalList"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>

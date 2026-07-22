@@ -2,28 +2,31 @@
 
 Milestones are sequential. A later milestone cannot begin until the preceding milestone is reviewed and closed through repository metadata and, where required, an ADR.
 
-## Now — Foundation and scope control
+## Completed
 
-Milestone ID: `foundation-protocol-workbench` (active).
+- `foundation-protocol-workbench`: prototype archived, shared ownership established, scope and runtime guardrails accepted.
+- Component/message inventory reviewed and approved in the sibling Protocol Contract repository.
+- Smallest viable protocol v1 frozen as `1.0.0`.
+- Reference codec and cross-language conformance suite released as Protocol Contract `1.0.1`.
 
-- Preserve the exact experimental web-simulator snapshot and tag.
-- Establish the standalone draft Protocol Contract and v0 evidence.
-- Document Packet Predator as a developer packet workbench.
-- Quarantine game, Game Master Console-like, and autonomous-simulation behavior.
-- Enforce runtime hashes, known architecture exceptions, protocol ownership, and repository hygiene.
-- Make no runtime, endpoint, frontend, dependency, or wire-format changes.
+## Now — Layered local workbench
 
-Exit requires both repository checks to pass and human review of this checkpoint.
+Milestone ID: `layered-local-workbench` (active).
 
-## Next — Inventory review
+- Consume the sibling Protocol Contract reference codec without copying constants.
+- Separate wire interpretation, transport status, workbench service, and thin web concerns.
+- Provide a clear browser inspector that runs on an ordinary Linux laptop without radio hardware.
+- Browse exact fixtures, paste/decode logical or padded frames, and expose labelled fields plus raw bytes.
+- Keep the archived simulator, rules, map, and privileged game controls absent from the supported entrypoint.
+- Retain an explicit inspect-only transport boundary for later physical adapters.
 
-1. Review and approve the component/message inventory with Packet Predator, Game Controller, Game Master Console, and node stakeholders. System roles plus Player Node and Task Node semantics were recorded on 2026-07-20; Environment Node and the exact message inventory remain to be reviewed. Resolve each row by acceptance, removal, or explicit ownership and requirements. Do not design/freeze v1 during the review itself.
+Exit requires the Packet Predator and Protocol Contract checks to pass, local browser/API verification without hardware, a clean architecture scan, and human review.
 
-## Later — Fixed order after inventory approval
+## Next — Deterministic replay and fake transport
 
-2. Design and freeze the smallest viable protocol v1.
-3. Add a reference codec and cross-language conformance fixtures.
-4. Refactor Packet Predator into protocol, transport, service, and thin web layers; replace the foundation runtime manifest through an accepted ADR.
-5. Replace the game simulator with deterministic replay/fake transport.
-6. Validate capture and transmission through one selected physical adapter.
-7. Build Game Controller and Game Master Console as distinct deployed roles against the shared contract; a console platform or presentation components may be shared without sharing production capabilities.
+1. Add explicit deterministic capture replay and a fake transport through the published transport interface. Do not restore autonomous game actors.
+
+## Later — Fixed order
+
+2. Validate capture and transmission through one selected physical adapter.
+3. Build Game Controller and Game Master Console as distinct deployed roles against the shared contract; a console platform or presentation components may be shared without sharing production capabilities.

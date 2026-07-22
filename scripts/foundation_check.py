@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Foundation scope, runtime-freeze, and repository hygiene checks."""
+"""Workbench scope, archive-preservation, and repository hygiene checks."""
 
 from __future__ import annotations
 
@@ -19,6 +19,24 @@ class GuardError(Exception):
 
 
 FORBIDDEN_IMPORT_ROOTS = {"game_controller", "god_tool", "rules_engine", "simulator"}
+ARCHIVED_RUNTIME_IMPORT_ROOTS = {
+    "decoder",
+    "driver",
+    "nodes",
+    "packet",
+    "simulator",
+    "web_app",
+}
+HARDWARE_IMPORT_ROOTS = {
+    "RPi",
+    "gpiozero",
+    "lgpio",
+    "nrf905",
+    "rpi_lgpio",
+    "serial",
+    "spidev",
+    "vcgencmd",
+}
 LOCAL_CONTRACT_MODULES = ("packet", "nodes.node")
 PROTOCOL_SYMBOLS = {
     "Packet",
@@ -216,6 +234,10 @@ def collect_architecture_violations(root: Path, runtime_paths: Iterable[str] | N
                 violations.add(f"forbidden-dependency|{relative}|{module}")
             if module == "nodes.node" or module == "packet" or module.startswith("packet."):
                 violations.add(f"local-contract-import|{relative}|{module}")
+            if relative.startswith("packet_predator/") and import_root in ARCHIVED_RUNTIME_IMPORT_ROOTS:
+                violations.add(f"supported-runtime-imports-archive|{relative}|{module}")
+            if relative.startswith("packet_predator/") and import_root in HARDWARE_IMPORT_ROOTS:
+                violations.add(f"hardware-dependency|{relative}|{module}")
 
         for node in ast.walk(tree):
             if not isinstance(node, ast.ClassDef):
@@ -268,7 +290,7 @@ def collect_architecture_violations(root: Path, runtime_paths: Iterable[str] | N
 
 def architecture_exception_ids(path: Path) -> set[str]:
     data = load_json(path)
-    if data.get("status") != "baseline-only-not-approved-design":
+    if data.get("status") != "archived-legacy-only":
         raise GuardError(f"{path}: invalid architecture exception status")
     exceptions = data.get("exceptions")
     if not isinstance(exceptions, list):
@@ -339,7 +361,9 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
         "docs/ideas.md",
         "docs/runtime-inventory.md",
         "docs/adr/0001-foundation-runtime-freeze.md",
+        "docs/adr/0003-begin-layered-workbench-runtime.md",
         ".foundation/milestone.json",
+        ".foundation/runtime-baseline.json",
         ".foundation/runtime-freeze.sha256",
         ".foundation/architecture-exceptions.json",
         ".foundation/quarantine.json",
@@ -350,30 +374,65 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
     milestone = load_json(root / ".foundation/milestone.json")
     expected = {
         "active_lane": "Now",
-        "milestone_id": "foundation-protocol-workbench",
+        "milestone_id": "layered-local-workbench",
         "status": "active",
-        "runtime_changes_allowed": False,
+        "runtime_changes_allowed": True,
         "protocol_authority": "../Protocol_Contract",
+        "runtime_baseline": ".foundation/runtime-baseline.json",
     }
     wrong = {key: (milestone.get(key), value) for key, value in expected.items() if milestone.get(key) != value}
     if wrong:
         raise GuardError(f"active milestone metadata is invalid: {wrong}")
     freeze = milestone.get("runtime_freeze")
-    if not isinstance(freeze, dict) or freeze.get("enforced") is not True:
-        raise GuardError("foundation milestone must enforce the runtime freeze")
-    if freeze.get("replacement_requires_adr") is not True or freeze.get("replacement_adr") is not None:
-        raise GuardError("foundation runtime freeze replacement rule is invalid")
+    if not isinstance(freeze, dict) or freeze.get("enforced") is not False:
+        raise GuardError("layered milestone must retain but supersede the all-runtime freeze")
+    if (
+        freeze.get("replacement_requires_adr") is not True
+        or freeze.get("replacement_adr") != "docs/adr/0003-begin-layered-workbench-runtime.md"
+        or freeze.get("legacy_files_remain_immutable") is not True
+    ):
+        raise GuardError("archived runtime preservation rule is invalid")
+
+    baseline = load_json(root / milestone["runtime_baseline"])
+    baseline_expected = {
+        "status": "active-layered-workbench",
+        "milestone_id": "layered-local-workbench",
+        "protocol_authority": "../Protocol_Contract",
+        "supported_entrypoint": "packet_predator.web:app",
+        "default_transport": "inspect-only",
+        "hardware_imports_allowed": False,
+    }
+    baseline_wrong = {
+        key: (baseline.get(key), value)
+        for key, value in baseline_expected.items()
+        if baseline.get(key) != value
+    }
+    if baseline_wrong:
+        raise GuardError(f"supported runtime baseline is invalid: {baseline_wrong}")
+    supported = baseline.get("supported_runtime")
+    if not isinstance(supported, dict) or not supported:
+        raise GuardError("supported runtime baseline needs a non-empty named path allow-list")
+    missing_supported = [relative for relative in supported.values() if not (root / relative).exists()]
+    if missing_supported:
+        raise GuardError("supported runtime baseline paths are missing: " + ", ".join(missing_supported))
+    archive = baseline.get("legacy_archive")
+    if not isinstance(archive, dict) or archive.get("snapshot_tag") != freeze.get("snapshot_tag"):
+        raise GuardError("supported runtime baseline does not preserve the archive tag")
+    if (
+        archive.get("manifest") != freeze.get("manifest")
+        or archive.get("policy") != "immutable-unsupported-evidence"
+    ):
+        raise GuardError("supported runtime baseline does not preserve the archive manifest")
+
     roadmap = (root / "docs/roadmap.md").read_text(encoding="utf-8")
-    if "## Now — Foundation and scope control" not in roadmap or milestone["milestone_id"] not in roadmap:
+    if "## Now — Layered local workbench" not in roadmap or milestone["milestone_id"] not in roadmap:
         raise GuardError("docs/roadmap.md does not identify the active Now milestone")
     ordered = [
-        "1. Review and approve the component/message inventory",
-        "2. Design and freeze the smallest viable protocol v1.",
-        "3. Add a reference codec and cross-language conformance fixtures.",
-        "4. Refactor Packet Predator into protocol, transport, service, and thin web layers",
-        "5. Replace the game simulator with deterministic replay/fake transport.",
-        "6. Validate capture and transmission through one selected physical adapter.",
-        "7. Build Game Controller and Game Master Console as distinct deployed roles against the shared contract; a console platform or presentation components may be shared without sharing production capabilities.",
+        "Reference codec and cross-language conformance suite released as Protocol Contract `1.0.1`.",
+        "## Now — Layered local workbench",
+        "## Next — Deterministic replay and fake transport",
+        "2. Validate capture and transmission through one selected physical adapter.",
+        "3. Build Game Controller and Game Master Console as distinct deployed roles against the shared contract; a console platform or presentation components may be shared without sharing production capabilities.",
     ]
     positions = [roadmap.find(text) for text in ordered]
     if any(position < 0 for position in positions) or positions != sorted(positions):
@@ -399,8 +458,8 @@ def verify_no_tracked_generated_artifacts(root: Path) -> None:
 def validate(root: Path) -> None:
     milestone = verify_documents_and_milestone(root)
     verify_runtime_hashes(root)
-    runtime_files = discover_runtime_files(root)
-    verify_archive_snapshot(root, milestone, runtime_files)
+    archived_files = sorted(parse_hash_manifest(root / milestone["runtime_freeze"]["manifest"]))
+    verify_archive_snapshot(root, milestone, archived_files)
     verify_architecture(root)
     verify_quarantine(root)
     verify_no_tracked_generated_artifacts(root)
@@ -423,7 +482,7 @@ def main() -> int:
     except (GuardError, OSError) as exc:
         print(f"foundation check failed: {exc}", file=sys.stderr)
         return 1
-    print("foundation checks passed: documents, runtime freeze, architecture baseline, quarantine, hygiene")
+    print("workbench checks passed: documents, archive preservation, architecture, quarantine, hygiene")
     return 0
 
 
