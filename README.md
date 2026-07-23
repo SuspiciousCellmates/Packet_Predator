@@ -2,6 +2,8 @@
 
 Packet Predator is an experimental developer packet workbench for Suspicious Cellmates. Its intended responsibility is to inspect, construct, capture, replay, and validate protocol messages through selectable transports. It is not the shared application shell.
 
+**New to the project?** Start with [Packet Predator: a beginner's guide](USER_GUIDE.md). It explains the workbench through examples, gives simple operating instructions, and includes a glossary.
+
 ## Current status
 
 The supported application is a layered browser workbench. By default it is hardware-free and uses the sibling Protocol Contract `1.0.1` reference codec to inspect all 38 conformance frames, hexadecimal bytes you paste, or frames released by a deliberately selected deterministic recording. The active physical milestone also provides an explicitly configured experimental nRF905 adapter for a two-Raspberry-Pi validation bench. It never starts a radio without a profile, or starts a fake node, game coordinator, or autonomous scenario.

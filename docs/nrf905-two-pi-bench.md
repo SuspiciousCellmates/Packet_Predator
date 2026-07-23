@@ -96,6 +96,17 @@ Send from Pi B:
 
 This time the expected decoded name is `NODE_STATUS`. Save both successful receiver outputs for milestone review.
 
+## Update a prepared Pi
+
+Treat each Pi as a deployment target and make source changes on the development computer. Once both sibling repositories have Git remotes and tracking branches configured, update either Pi with:
+
+```sh
+cd ~/Suspicious_Cellmates/Packet_Predator
+./scripts/update-rpi
+```
+
+The updater first refuses dirty, detached, untracked, or diverged repository states. It then fetches both repositories, applies fast-forward-only updates, refreshes Raspberry Pi dependencies only when needed, and runs the complete Packet Predator check. Ignored local radio profiles are preserved. Restart a running workbench deliberately after the update.
+
 ## Use the browser
 
 On either Pi, localhost remains the safe default:

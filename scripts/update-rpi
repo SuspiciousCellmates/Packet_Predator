@@ -1,0 +1,93 @@
+#!/usr/bin/env sh
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+contract_root=$(CDPATH= cd -- "$repo_root/../Protocol_Contract" 2>/dev/null && pwd || true)
+
+usage() {
+    cat <<'EOF'
+usage: ./scripts/update-rpi
+
+Safely update Protocol Contract and Packet Predator from their configured Git
+upstreams, refresh Raspberry Pi dependencies when required, and run the
+Packet Predator checks.
+
+The command refuses to continue when either repository has local changes, is
+not on a branch, has no upstream, or has diverged from its upstream.
+Pi-specific ignored files, including config/*.local.json, are preserved.
+EOF
+}
+
+if [ "$#" -gt 0 ]; then
+    if [ "$#" -eq 1 ] && { [ "$1" = "--help" ] || [ "$1" = "-h" ]; }; then
+        usage
+        exit 0
+    fi
+    usage >&2
+    exit 2
+fi
+
+fail() {
+    echo "update-rpi: $*" >&2
+    exit 1
+}
+
+preflight_repository() {
+    label=$1
+    path=$2
+
+    git -C "$path" rev-parse --is-inside-work-tree >/dev/null 2>&1 ||
+        fail "$label is not a Git repository: $path"
+
+    if [ -n "$(git -C "$path" status --porcelain --untracked-files=normal)" ]; then
+        fail "$label has local changes. Commit, move, or remove them before updating."
+    fi
+
+    branch=$(git -C "$path" symbolic-ref --quiet --short HEAD) ||
+        fail "$label is not on a branch. Switch to the intended deployment branch first."
+    upstream=$(git -C "$path" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null) ||
+        fail "$label branch '$branch' has no upstream. Configure one before updating."
+
+    echo "$label: $branch tracking $upstream"
+}
+
+[ -n "$contract_root" ] ||
+    fail "Protocol_Contract must be beside Packet_Predator under the same parent folder."
+
+command -v git >/dev/null 2>&1 || fail "Git is not installed."
+
+preflight_repository "Protocol Contract" "$contract_root"
+preflight_repository "Packet Predator" "$repo_root"
+
+echo "Fetching both repositories..."
+git -C "$contract_root" fetch --prune
+git -C "$repo_root" fetch --prune
+
+for repository in "$contract_root" "$repo_root"; do
+    if ! git -C "$repository" merge-base --is-ancestor HEAD '@{upstream}'; then
+        fail "$(basename "$repository") has local commits or has diverged from its upstream; no files were merged."
+    fi
+done
+
+echo "Applying fast-forward updates..."
+git -C "$contract_root" merge --ff-only '@{upstream}'
+git -C "$repo_root" merge --ff-only '@{upstream}'
+
+dependency_stamp="$repo_root/.venv/.packet-predator-requirements-rpi.txt"
+if [ ! -x "$repo_root/.venv/bin/python" ] ||
+   [ ! -f "$dependency_stamp" ] ||
+   ! cmp -s "$repo_root/requirements-rpi.txt" "$dependency_stamp"; then
+    echo "Preparing Raspberry Pi Python dependencies..."
+    "$repo_root/scripts/setup-rpi"
+    cp "$repo_root/requirements-rpi.txt" "$dependency_stamp"
+else
+    echo "Raspberry Pi Python dependencies are already current."
+fi
+
+echo "Running Packet Predator checks..."
+"$repo_root/scripts/check"
+
+echo "Update complete."
+echo "Protocol Contract: $(git -C "$contract_root" rev-parse --short HEAD)"
+echo "Packet Predator:   $(git -C "$repo_root" rev-parse --short HEAD)"
+echo "The local radio profile was preserved. Restart Packet Predator when ready."
