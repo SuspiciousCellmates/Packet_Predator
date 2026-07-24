@@ -4,16 +4,15 @@ This is the first physical Packet Predator adapter checkpoint. Each Raspberry Pi
 
 The nRF905 is experimental. Passing this bench proves these two modules and this profile can exchange frames. It does not commit the project to nRF905 or approve a frequency for every venue.
 
-## Before wiring
+The original Packet Predator HAT configuration passed this test in both directions on 2026-07-24. The exact evidence and recovered configuration are recorded in [the physical validation result](nrf905-validation-2026-07-24.md).
 
-- Identify the labels on the actual module: `VCC`, `GND`, `CSN`, `SCK`, `MOSI`, `MISO`, `PWR_UP`, `TRX_CE`, `TX_EN`, `CD`, `AM`, and `DR` are expected. Stop if its labels or supply requirements differ.
+## Original Packet Predator HAT wiring
+
 - Fit the correct antenna before transmitting.
-- The nRF905 silicon operates from 1.9–3.6 V and Raspberry Pi GPIO is 3.3 V. The table below uses the Pi's 3.3 V rail. Do not apply 5 V to an unverified module or any Pi GPIO.
+- The original HAT routes the nRF905 to the header as shown below. Do not move those connections in software merely because another example uses different GPIO numbers.
+- For a bare module or different PCB, identify `VCC`, `GND`, `CSN`, `SCK`, `MOSI`, `MISO`, `PWR_UP`, `TRX_CE`, `TX_EN`, `CD`, `AM`, and `DR` and create a separate profile matching its real wiring.
+- The nRF905 silicon operates from 1.9–3.6 V and Raspberry Pi GPIO is 3.3 V. Do not apply 5 V to an unverified module or any Pi GPIO.
 - The example radio channel is inherited only as a non-transmitting register-test value. Review the locally permitted frequency before changing `transmit_enabled` to `true`.
-
-## Proposed wiring
-
-The SPI0 pins are fixed by the Pi. The six control/status GPIO choices are simply a documented bench allocation and can be changed in the profile if necessary.
 
 | nRF905 module | Raspberry Pi signal | Physical header pin |
 |---|---|---:|
@@ -23,14 +22,25 @@ The SPI0 pins are fixed by the Pi. The six control/status GPIO choices are simpl
 | `MOSI` | GPIO10 / SPI0 MOSI | 19 |
 | `MISO` | GPIO9 / SPI0 MISO | 21 |
 | `CSN` | GPIO8 / SPI0 CE0 | 24 |
-| `PWR_UP` | GPIO25 | 22 |
-| `TRX_CE` | GPIO24 | 18 |
+| `PWR_UP` | GPIO21 | 40 |
+| `TRX_CE` | GPIO7 | 26 |
 | `TX_EN` | GPIO23 | 16 |
-| `CD` | GPIO5 | 29 |
-| `AM` | GPIO6 | 31 |
-| `DR` | GPIO22 | 15 |
+| `CD` | GPIO18 | 12 |
+| `AM` | GPIO22 | 15 |
+| `DR` | GPIO17 | 11 |
 
-Wire both benches the same way. Power each Pi down while changing wiring.
+The historical driver preserved this mapping and used 125 kHz SPI. The physical test confirmed the pinout on both available HATs, first at that historical speed and then again at 1 MHz. The shipped example profile now represents the proven 1 MHz configuration. Power a Pi down before fitting or removing a HAT.
+
+### Why the Pi 5 needs a one-chip-select overlay
+
+The HAT is physically wired with `TRX_CE` on GPIO7. Raspberry Pi OS normally reserves GPIO7 as SPI0's second chip-select, `CE1`, even though this HAT communicates over the first chip-select, `CE0`, on GPIO8.
+
+Two settings therefore have different jobs:
+
+- `dtoverlay=spi0-1cs` tells Linux that SPI0 uses only `CE0`, releasing GPIO7 for ordinary GPIO use.
+- `gpio.trx_ce: 7` in the Packet Predator profile tells the application to use that released GPIO7 for the radio's `TRX_CE` signal.
+
+Neither setting replaces the other. The overlay controls Linux pin ownership; the profile describes the PCB connection.
 
 ## Prepare each Pi
 
@@ -42,7 +52,22 @@ Enable SPI:
 sudo raspi-config
 ```
 
-Choose **Interface Options → SPI → Yes**, finish, and reboot. Then, in Packet Predator:
+Choose **Interface Options → SPI → Yes** and finish. Then edit `/boot/firmware/config.txt`. In its existing `[pi5]` section, add:
+
+```ini
+dtoverlay=spi0-1cs
+```
+
+Leave unrelated default lines such as `dtoverlay=nospi10` unchanged. Reboot, then verify the result:
+
+```sh
+ls -l /dev/spidev0.*
+gpioinfo | grep -E 'line +(7|8|17|18|21|22|23):'
+```
+
+`/dev/spidev0.0` should exist, `/dev/spidev0.1` should not exist, GPIO8 should remain owned by `spi0 CS0`, and GPIO7 should no longer be owned by `spi0 CS1`.
+
+Then, in Packet Predator:
 
 ```sh
 sudo apt install python3-venv python3-dev gcc
@@ -53,6 +78,8 @@ cp config/nrf905-bench.example.json config/nrf905-bench.local.json
 ```
 
 The profile command performs no hardware access. The probe opens `/dev/spidev0.0` and the configured GPIO chip, writes all ten nRF905 configuration bytes, reads them back, and fails if any byte differs. The local profile is ignored by Git.
+
+The example uses the subsequently validated 1 MHz SPI clock. This is only the short wired conversation between the Pi and radio while loading registers and a frame; it does not set the RF frequency or over-air data rate. The initial successful exchange used the historical 125 kHz baseline, then the complete send/receive test passed again in both directions at 1 MHz. If later hardware has marginal wiring or signal integrity, 125 kHz remains a useful diagnostic fallback rather than the normal profile.
 
 If `/dev/gpiochip0` is not the user-header GPIO chip on the installed Raspberry Pi OS image, inspect `gpioinfo` and change only `gpio.chip`. If the SPI device is absent, recheck that SPI was enabled and the Pi rebooted.
 
@@ -95,6 +122,44 @@ Send from Pi B:
 ```
 
 This time the expected decoded name is `NODE_STATUS`. Save both successful receiver outputs for milestone review.
+
+## What the test actually does
+
+The diagnostic is a chain of small, checkable operations rather than one unexplained radio action.
+
+1. **Load the local hardware profile.** Packet Predator validates the JSON before touching hardware. This supplies the SPI device, six GPIO connections, RF channel, physical radio address, CRC mode, and explicit permission to transmit.
+2. **Load the shared Protocol Contract.** Packet Predator opens the sibling repository's stable registry, reference codec, and released fixtures. The radio adapter itself never learns what `CONTROLLER_BEACON` means.
+3. **Resolve the requested fixture.** For `send --fixture v1-controller-beacon`, the wire adapter finds that official example, decodes it through the reference codec, then re-encodes it from the registered message schema. Requesting fixed mode adds zero padding to exactly 32 bytes.
+4. **Probe the radio.** The nRF905 adapter converts the deployment profile into the chip's ten configuration bytes, writes them over SPI, reads them back, and requires an exact match.
+5. **Transmit opaque bytes.** The adapter loads the four-byte physical radio address and exact 32-byte frame into the nRF905 FIFOs, changes `TX_EN` and `TRX_CE`, and waits for the hardware `DR` line. A successful `DR` signal produced the reported transmission-completion time.
+6. **Receive opaque bytes.** The other nRF905 first checks its physical address and hardware CRC. When `DR` says a complete frame is ready, Packet Predator reads exactly 32 bytes from the receive FIFO.
+7. **Compare before interpreting.** The receive diagnostic compares all 32 received bytes with the selected released fixture. A single different byte returns `RECEIVED_FRAME_MISMATCH`; no decoder guess can turn it into a pass.
+8. **Decode through the contract.** Only after the exact comparison passes does the reference codec read the four-byte logical envelope, use the registered message type to select the payload layout, decode little-endian field values, and verify that all remaining fixed-frame padding is zero.
+
+The nRF905 hardware CRC is added and checked by the radios outside the 32-byte application frame. It is therefore important protection on air, but it does not appear in the printed hexadecimal frame.
+
+### Reading the successful controller beacon by hand
+
+The successful frame was:
+
+```text
+4c 06 00 01 07 00 e8 03 00 00 d0 07 00 00 02 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+```
+
+| Bytes | Meaning |
+|---|---|
+| `4c` | Wire generation 1 in the upper two bits and payload length 12 in the lower six bits |
+| `06` | Registered message type 6: `CONTROLLER_BEACON` |
+| `00` | Logical source 0: Game Controller |
+| `01` | Logical destination 1: node endpoint 1 |
+| `07 00` | Beacon sequence 7 |
+| `e8 03 00 00` | Controller/game tick 1000 |
+| `d0 07 00 00` | Authority valid-until tick 2000 |
+| `02 00` | Global-state revision 2 |
+| final 16 zero bytes | Blank padding added for the nRF905's fixed 32-byte payload |
+
+The physical radio address `A7C35E19` is not one of these bytes. The nRF905 uses it first to decide whether to receive the radio transmission. The source and destination inside the frame are the transport-neutral logical participants interpreted by the protocol.
 
 ## Update a prepared Pi
 

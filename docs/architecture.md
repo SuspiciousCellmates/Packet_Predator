@@ -44,7 +44,7 @@ Dependency direction is web → service → replay catalogue / transport / wire 
 ## Existing-module disposition
 
 - `packet/`, `decoder.py`, and `nodes/node.py`: retain only as v0 evidence; replace with a future contract-owned reference codec/binding after v1.
-- `driver/nrf905.py`: retain as experimental evidence; later adapt behind a transport interface and validate physically.
+- `driver/nrf905.py`: retain only as experimental archive evidence and never import it into the supported runtime. The isolated replacement under `packet_predator/adapters/` was physically validated on the original HATs in both directions on 2026-07-24.
 - `driver/virtual_airwaves.py`: replace with deterministic fake/replay transport.
 - `web_app.py`: later split into protocol, transport, workbench service, and thin web layers; remove production game/controller/Game Master Console concerns from supported scope.
 - `web/`: retain packet-workbench views where useful; quarantine map and game controls.

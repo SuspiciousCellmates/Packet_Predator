@@ -22,6 +22,8 @@ Milestone ID: `nrf905-physical-adapter-validation` (active).
 - Decode and journal physical frames through the existing reference-codec and service boundary.
 - Retain inspect-only startup when no adapter profile is supplied; add no node emulation, automatic replies, game state, or policy.
 
+Physical evidence collected on 2026-07-24: the two original Packet Predator nRF905 HAT benches delivered exact released fixtures from Pi A to Pi B and Pi B to Pi A, with both messages decoded through Protocol Contract `1.0.1`. See [the validation result](nrf905-validation-2026-07-24.md).
+
 Exit requires passing fake-backend adapter tests, clear malformed-profile and timeout failures, exact register readback on both Pis, exact fixture delivery in both RF directions, both repository checks, and human review of the physical evidence.
 
 ## Next — Game applications

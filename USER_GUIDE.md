@@ -172,6 +172,28 @@ The confirmation applies to one transmission only. It must be ticked again befor
 
 Radio setup, wiring, diagnostic commands, and the exact two-way test are explained separately in [the nRF905 two-Raspberry-Pi bench guide](docs/nrf905-two-pi-bench.md). Have someone comfortable with electronics complete that preparation. Always power the Pi off before changing wires, use the correct antenna, and never connect an unverified module to 5 volts.
 
+## What happens when the radio test runs
+
+The diagnostic script is not secretly deciding what bytes a message should contain. It works through a chain in which each part has one job.
+
+Suppose you ask it to send the official **Controller beacon** example. Packet Predator goes to the sibling Protocol Contract repository and finds that released fixture. The reference codec reads the contract's registry, checks the fixture, and rebuilds the message using the registered layout. Because the nRF905 carries fixed 32-byte blocks, blank zero bytes are added after the meaningful message until it is exactly 32 bytes long.
+
+The radio adapter then receives those 32 bytes without knowing that they mean “Controller beacon.” It writes them into the nRF905 and asks the hardware to transmit. The radio adds its own CRC error check on air; those CRC bits sit outside the 32-byte application message.
+
+At the other Pi, the nRF905 accepts traffic matching its physical radio address and CRC. Packet Predator reads the resulting 32 bytes. Before trying to explain anything, the diagnostic compares every received byte with the official fixture it expected. One changed byte makes the test fail.
+
+Only after all bytes match does the reference codec decode the message. It reads the small envelope to learn the wire generation, payload length, message type, logical sender, and logical recipient. The registered message type selects the one permitted payload layout, and the codec converts each little-endian sequence of bytes into its named numeric value. Packet Predator then adds friendly labels such as **Game Controller**, **Node endpoint 1**, and **Controller beacon** for display.
+
+This separation is deliberate:
+
+- the Protocol Contract defines the bytes and their meaning;
+- the reference codec translates between those definitions and bytes;
+- the nRF905 adapter moves an opaque 32-byte block;
+- the diagnostic proves the block was unchanged; and
+- Packet Predator presents the decoded result.
+
+The successful 2026-07-24 test is recorded in [the physical validation result](docs/nrf905-validation-2026-07-24.md). The bench guide also breaks the successful Controller beacon down byte by byte.
+
 ## Keeping a prepared Pi up to date
 
 Packet Predator and the Protocol Contract are stored in Git repositories. Git lets the Pi download reviewed development changes without copying files manually.
@@ -248,11 +270,19 @@ A message observed as it arrives from a transport, such as a radio.
 **Channel**  
 One selectable radio frequency setting. Two nRF905 radios need compatible settings to hear one another. The appropriate setting must also comply with local radio rules.
 
+**Codec**
+
+A translator between named message fields and their exact byte representation. “Encoding” builds bytes; “decoding” reads bytes back into fields. Packet Predator uses the sibling Protocol Contract's reference codec.
+
 **Contract example or fixture**  
 A known-good sample message published with the Protocol Contract. These examples give every program a shared answer to compare against.
 
 **Deterministic**  
 Guaranteed to happen the same way each time. A deterministic recording contains the same messages, order, and timing whenever it is replayed.
+
+**Device Tree overlay**
+
+A Raspberry Pi boot setting that describes or adjusts how Linux should use hardware and GPIO pins. The original nRF905 HAT uses one to release GPIO7 from an unused second SPI chip-select.
 
 **Environment Node**  
 An optional device that creates room effects, such as lights or a siren. These nodes are not required for the first playable version.
@@ -268,6 +298,14 @@ The authoritative program that runs the game, keeps game state, applies rules, a
 
 **Game Master Console**  
 The trusted live control panel used by the person running a game. It asks the Game Controller to perform actions such as handling a failed task station or applying a deliberate intervention. It is not Packet Predator.
+
+**GPIO**
+
+A controllable electrical pin on the Raspberry Pi. Packet Predator uses several GPIO pins to power the radio, select transmit or receive mode, and read status signals.
+
+**Hardware CRC**
+
+An error-detection value added and checked by the nRF905 itself. It helps reject radio frames damaged in transit and is not part of the 32-byte protocol message.
 
 **Hexadecimal or hex**  
 A compact way to write bytes using the digits 0–9 and letters A–F. For example, decimal 15 is written as `0F` when displayed as one byte.
@@ -322,6 +360,10 @@ The journey described by a message's source and destination: who sent it and who
 
 **SSH**  
 A secure way to open a terminal on another computer over a network. It can also carry the Pi's private Packet Predator webpage to your own computer.
+
+**SPI**
+
+The short wired connection used by the Raspberry Pi to configure the nearby nRF905 and move payload bytes into or out of it. SPI speed is separate from radio frequency and over-air data rate.
 
 **Task Node**  
 A physical task station that players interact with. The Task Node is responsible for deciding when its own task has been successfully completed and reporting that outcome to the Game Controller.

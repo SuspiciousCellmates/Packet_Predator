@@ -38,3 +38,14 @@ The software and fake-backend tests can be completed without the physical bench.
 ## Consequences
 
 Packet Predator gains real capture and explicit manual transmission through one adapter without becoming a Game Controller or simulated participant. Hardware failures can be localized to profile validation, Linux device access, nRF905 register communication, transmit completion, or received-byte comparison. A later adapter can implement the same opaque-frame boundary without inheriting nRF905 configuration.
+
+## Physical validation outcome
+
+On 2026-07-24, the two available Raspberry Pi 5 and original Packet Predator nRF905 HAT benches passed the required exchange in both directions:
+
+- Pi A transmitted the exact fixed `v1-controller-beacon` fixture, reported completion after 6.999 ms, and Pi B received the same 32 bytes and decoded `CONTROLLER_BEACON`.
+- Pi B transmitted the exact fixed `v1-node-status` fixture, reported completion after 7.003 ms, and Pi A received the same 32 bytes and decoded `NODE_STATUS`.
+
+The recovered HAT profile uses SPI0 CE0, `PWR_UP` GPIO21, `TRX_CE` GPIO7, `TX_EN` GPIO23, `CD` GPIO18, `AM` GPIO22, and `DR` GPIO17. The first passing run reproduced the archived 125 kHz SPI baseline; a subsequent complete bidirectional run also passed at 1 MHz, which is now the shipped example setting. Raspberry Pi 5 requires `dtoverlay=spi0-1cs` to release GPIO7 from the unused SPI0 CE1 function. These deployment details do not alter the v1 wire contract.
+
+The complete configuration, failure diagnosis, exact frames, results, and limits of the evidence are recorded in [nRF905 physical validation result — 2026-07-24](../nrf905-validation-2026-07-24.md).

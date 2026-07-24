@@ -95,6 +95,18 @@ class ProfileTests(unittest.TestCase):
     def test_example_profile_is_receive_only_and_builds_expected_register(self):
         profile = load_nrf905_profile(EXAMPLE_PROFILE)
         self.assertFalse(profile.radio.transmit_enabled)
+        self.assertEqual(profile.spi.speed_hz, 1_000_000)
+        self.assertEqual(
+            profile.gpio.named_lines(),
+            {
+                "pwr_up": 21,
+                "trx_ce": 7,
+                "tx_en": 23,
+                "carrier_detect": 18,
+                "address_match": 22,
+                "data_ready": 17,
+            },
+        )
         self.assertEqual(profile.radio.frequency_mhz, 433.2)
         self.assertEqual(configuration_bytes(profile).hex(), "6c00442020a7c35e19d8")
 
