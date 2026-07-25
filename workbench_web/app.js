@@ -157,6 +157,11 @@ function chooseExample(id) {
   elements.frameInput.dataset.origin = `contract example: ${item.id}`;
   renderExamples();
   updateByteCount();
+
+  // Switch tab focus to Custom Hex Input
+  const hexTab = document.querySelector('.input-tab[data-input-tab="hex"]');
+  if (hexTab) hexTab.click();
+
   inspectFrame();
 }
 
@@ -518,10 +523,28 @@ function bindTabs() {
   });
 }
 
+function bindInputTabs() {
+  document.querySelectorAll(".input-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".input-tab").forEach((item) => {
+        const selected = item === tab;
+        item.classList.toggle("active", selected);
+        item.setAttribute("aria-selected", selected ? "true" : "false");
+      });
+      document.querySelectorAll(".input-tab-panel").forEach((panel) => {
+        const selected = panel.id === `input-panel-${tab.dataset.inputTab}`;
+        panel.classList.toggle("active", selected);
+        panel.hidden = !selected;
+      });
+    });
+  });
+}
+
 async function initialise() {
   applyTextSize(storedTextSize());
   applyTypeface(storedTypeface());
   bindTabs();
+  bindInputTabs();
   try {
     const [status, examples, replays] = await Promise.all([api("/api/status"), api("/api/v1/examples"), api("/api/replays")]);
     elements.carrierStatus.innerHTML = `<i></i> ${escaped(status.carrier.label)} · ${status.physical_adapter ? "listening" : "no radio"}`;
