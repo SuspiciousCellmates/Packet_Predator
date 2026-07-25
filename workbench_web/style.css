@@ -1014,6 +1014,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   letter-spacing: 0;
 }
 
+.replay-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .replay-schedule {
   list-style: none;
   padding: 0;
@@ -1021,7 +1028,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 220px;
+  flex: 1;
+  min-height: 120px;
   overflow-y: auto;
 }
 

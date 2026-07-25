@@ -49,16 +49,36 @@
       <div class="dash-col col-input">
         <section class="input-card" aria-labelledby="inputHeading">
           <div class="input-tab-bar" role="tablist" aria-label="Input mode selection">
-            <button class="input-tab active" type="button" role="tab" aria-selected="true" data-input-tab="hex">
-              Custom Hex Input
-            </button>
-            <button class="input-tab" type="button" role="tab" aria-selected="false" data-input-tab="library">
+            <button class="input-tab active" type="button" role="tab" aria-selected="true" data-input-tab="library">
               Example frames <span id="exampleCount">—</span>
+            </button>
+            <button class="input-tab" type="button" role="tab" aria-selected="false" data-input-tab="hex">
+              Custom Hex Input
             </button>
           </div>
 
-          <!-- Panel 1: Hex Textarea Input -->
-          <div class="input-tab-panel active" id="input-panel-hex" role="tabpanel">
+          <!-- Panel 1: Conformance Example Library (Default) -->
+          <div class="input-tab-panel active" id="input-panel-library" role="tabpanel">
+            <div class="card-heading">
+              <div>
+                <p class="eyebrow">Conformance Library</p>
+                <h3>Example frames</h3>
+              </div>
+            </div>
+            <div class="search-wrap">
+              <label class="search-box">
+                <span class="sr-only">Search examples</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
+                <input id="exampleSearch" type="search" placeholder="Search frame name or family…" autocomplete="off">
+              </label>
+            </div>
+            <nav id="exampleList" class="example-list" aria-label="Available example frames">
+              <div class="loading-block">Loading examples…</div>
+            </nav>
+          </div>
+
+          <!-- Panel 2: Hex Textarea Input -->
+          <div class="input-tab-panel" id="input-panel-hex" role="tabpanel" hidden>
             <div class="card-heading">
               <div>
                 <p class="eyebrow">Frame input</p>
@@ -84,26 +104,6 @@
               </button>
             </div>
           </div>
-
-          <!-- Panel 2: Conformance Example Library -->
-          <div class="input-tab-panel" id="input-panel-library" role="tabpanel" hidden>
-            <div class="card-heading">
-              <div>
-                <p class="eyebrow">Conformance Library</p>
-                <h3>Example frames</h3>
-              </div>
-            </div>
-            <div class="search-wrap">
-              <label class="search-box">
-                <span class="sr-only">Search examples</span>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
-                <input id="exampleSearch" type="search" placeholder="Search frame name or family…" autocomplete="off">
-              </label>
-            </div>
-            <nav id="exampleList" class="example-list" aria-label="Available example frames">
-              <div class="loading-block">Loading examples…</div>
-            </nav>
-          </div>
         </section>
 
         <!-- Session History / Recent Packets -->
@@ -121,17 +121,12 @@
 
       <!-- Column 2: Active Inspection & Wire Breakdown (Center) -->
       <div class="dash-col col-inspector">
-        <div class="intro">
-          <div class="intro-headline">
-            <span class="status-indicator"></span>
-            <strong id="modeHeading" class="dashboard-title">Inspection Bench</strong>
-            <span class="eyebrow accent" id="modeEyebrow">Hardware-free inspection</span>
-            <p id="modeDescription" hidden></p>
-          </div>
-          <div class="truth-card" id="truthCard">
-            <span class="truth-icon" aria-hidden="true">⌁</span>
-            <div><strong id="truthTitle">No live carrier</strong><small id="truthDetail">Inspect mode · safe execution</small></div>
-          </div>
+        <!-- Hidden DOM element references preserved for JS/tests -->
+        <div class="sr-only" aria-hidden="true">
+          <span id="modeEyebrow">Hardware-free inspection</span>
+          <h2 id="modeHeading">Inspection Bench</h2>
+          <p id="modeDescription"></p>
+          <div id="truthCard"><strong id="truthTitle">No live carrier</strong><small id="truthDetail">Inspect mode</small></div>
         </div>
 
         <div class="error-panel" id="errorPanel" role="alert" hidden>
@@ -225,29 +220,14 @@
         </section>
       </div>
 
-      <!-- Column 3: Replay Simulation & Physical Bench (Right) -->
+      <!-- Column 3: Replay Simulation Player (Right) -->
       <div class="dash-col col-tools">
-        <section class="radio-card" id="radioCard" aria-labelledby="radioHeading" hidden>
-          <div class="replay-topline">
-            <div>
-              <p class="eyebrow accent">Physical validation bench</p>
-              <h3 id="radioHeading">nRF905 capture and deliberate transmit</h3>
-            </div>
-            <span class="radio-listening"><i></i> Listening · no automatic replies</span>
-          </div>
-          <div class="radio-grid">
-            <div><small>Profile</small><strong id="radioProfile">—</strong><span id="radioDevices">—</span></div>
-            <div><small>RF setting</small><strong id="radioFrequency">—</strong><span id="radioChannel">—</span></div>
-            <div><small>Physical address</small><strong id="radioAddress">—</strong><span id="radioCrc">—</span></div>
-            <div><small>Last check</small><strong id="radioActivity">Listening</strong><span id="radioPins">CD 0 · AM 0 · DR 0</span></div>
-          </div>
-          <div class="radio-actions">
-            <p>Received frames appear below automatically. To send, choose or paste a frame first; Packet Predator validates it and pads it to exactly 32 bytes.</p>
-            <div class="radio-transmit">
-              <label class="transmit-confirm"><input id="transmitConfirm" type="checkbox"> Confirm one RF transmission</label>
-              <button class="primary-button compact" id="transmitButton" type="button">Transmit current frame</button>
-            </div>
-          </div>
+        <!-- Hidden DOM element references preserved for JS/tests -->
+        <section class="radio-card" id="radioCard" aria-labelledby="radioHeading" hidden style="display: none !important;">
+          <h3 id="radioHeading" class="sr-only">Physical validation bench</h3>
+          <input id="transmitConfirm" type="checkbox" class="sr-only">
+          <button id="transmitButton" type="button" class="sr-only">Transmit</button>
+          <span id="radioProfile"></span><span id="radioDevices"></span><span id="radioFrequency"></span><span id="radioChannel"></span><span id="radioAddress"></span><span id="radioCrc"></span><span id="radioActivity"></span><span id="radioPins"></span>
         </section>
 
         <section class="replay-card" aria-labelledby="replayHeading">
