@@ -1292,7 +1292,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 
 .result-summary {
-  display: block;
+  display: none;
   margin: 6px 0 0;
   color: var(--muted);
   font-size: var(--text-base);
@@ -1462,6 +1462,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   padding: 20px 24px 24px;
 }
 
+#tab-fields {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -1563,7 +1570,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 
 .table-wrap {
-  max-height: 460px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: auto;
   border: 1px solid var(--line);

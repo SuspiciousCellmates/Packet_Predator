@@ -69,7 +69,7 @@ class WebApiTests(unittest.TestCase):
         self.assertIn(b"/assets/style.css?v=20260725-2", body)
         self.assertIn(b"/assets/app.js?v=20260725-2", body)
         self.assertNotIn(b"localhost:8400", body)
-        self.assertNotIn(b'id="resultSummary" hidden', body)
+        self.assertIn(b'id="resultSummary" hidden', body)
         self.assertLess(body.index(b'id="inputHeading"'), body.index(b'id="resultPanel"'))
         self.assertLess(body.index(b'id="resultPanel"'), body.index(b'id="radioCard"'))
         self.assertLess(body.index(b'id="radioCard"'), body.index(b'id="replayHeading"'))
@@ -77,7 +77,7 @@ class WebApiTests(unittest.TestCase):
         app_source = (REPO_ROOT / "workbench_web/app.js").read_text(encoding="utf-8")
         self.assertIn("elements.resultTitle.textContent = item.meaning.name;", app_source)
         self.assertIn("elements.radioDevices.textContent", app_source)
-        self.assertIn("escaped(row.label)", app_source)
+        self.assertIn("escaped(row.name)", app_source)
 
     def test_status_is_explicitly_inspect_only(self):
         status, _, body = asyncio.run(asgi_request("GET", "/api/status"))

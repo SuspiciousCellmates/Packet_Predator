@@ -214,7 +214,7 @@ function renderResult(item, shouldScroll = true) {
 
   elements.fieldTable.innerHTML = item.field_rows.map((row) => `
     <tr>
-      <td><div class="field-cell"><strong>${escaped(row.label)}</strong><small>${escaped(row.name)} · ${escaped(row.type)}</small></div></td>
+      <td><div class="field-cell"><small>[${escaped(row.type)}]</small><strong>${escaped(row.name)}</strong></div></td>
       <td>${annotationText(row.annotation)}</td>
       <td class="numeric">${escaped(valueText(row))}</td>
       <td class="wire-value">${escaped(row.value_hex)}</td>
