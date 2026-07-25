@@ -142,7 +142,7 @@
             <div>
               <p class="eyebrow accent" id="resultFamily">—</p>
               <h2 id="resultTitle">—</h2>
-              <p class="result-summary" id="resultSummary" hidden>—</p>
+              <p class="result-summary" id="resultSummary">—</p>
             </div>
             <div class="result-badges">
               <span id="messageValue">—</span>
@@ -219,23 +219,26 @@
 
       <!-- Column 3: Replay Simulation Player & Physical Transmit (Right) -->
       <div class="dash-col col-tools">
-        <!-- Compact Physical Radio Transmit Bar (active when physical radio is connected) -->
         <section class="radio-card" id="radioCard" aria-labelledby="radioHeading" hidden>
-          <div class="radio-bar-inline">
-            <div class="radio-meta">
-              <span class="radio-badge accent">nRF905 Radio</span>
-              <strong id="radioProfile">—</strong>
-              <small id="radioFrequency">—</small>
+          <div class="replay-topline">
+            <div>
+              <p class="eyebrow accent">Physical validation bench</p>
+              <h3 id="radioHeading">nRF905 capture and deliberate transmit</h3>
             </div>
-            <div class="radio-controls">
-              <label class="transmit-confirm"><input id="transmitConfirm" type="checkbox"> Confirm 1 RF transmission</label>
-              <button class="primary-button compact" id="transmitButton" type="button">Transmit frame</button>
-            </div>
+            <span class="radio-listening"><i></i> Listening · no automatic replies</span>
           </div>
-          <!-- Hidden DOM element references preserved for JS/tests -->
-          <div class="sr-only">
-            <h3 id="radioHeading">Physical validation bench</h3>
-            <span id="radioDevices"></span><span id="radioChannel"></span><span id="radioAddress"></span><span id="radioCrc"></span><span id="radioActivity"></span><span id="radioPins"></span>
+          <div class="radio-grid">
+            <div><small>Profile</small><strong id="radioProfile">—</strong><span id="radioDevices">—</span></div>
+            <div><small>RF setting</small><strong id="radioFrequency">—</strong><span id="radioChannel">—</span></div>
+            <div><small>Physical address</small><strong id="radioAddress">—</strong><span id="radioCrc">—</span></div>
+            <div><small>Last check</small><strong id="radioActivity">Listening</strong><span id="radioPins">CD 0 · AM 0 · DR 0</span></div>
+          </div>
+          <div class="radio-actions">
+            <p>Received frames appear below automatically. To send, choose or paste a frame first; Packet Predator validates it and pads it to exactly 32 bytes.</p>
+            <div class="radio-transmit">
+              <label class="transmit-confirm"><input id="transmitConfirm" type="checkbox"> Confirm one RF transmission</label>
+              <button class="primary-button compact" id="transmitButton" type="button">Transmit current frame</button>
+            </div>
           </div>
         </section>
 
@@ -299,8 +302,5 @@
       </div>
     </main>
   <script src="/assets/app.js?v=20260725-2" defer></script>
-<!-- impeccable-live-start -->
-<script src="http://localhost:8400/live.js?token=c6704705-dbb2-470d-94f2-04f20a744f65"></script>
-<!-- impeccable-live-end -->
 </body>
 </html>

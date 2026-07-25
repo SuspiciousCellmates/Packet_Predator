@@ -214,7 +214,7 @@ function renderResult(item, shouldScroll = true) {
 
   elements.fieldTable.innerHTML = item.field_rows.map((row) => `
     <tr>
-      <td><div class="field-cell"><small>[${escaped(row.type)}]</small><strong>${escaped(row.name)}</strong></div></td>
+      <td><div class="field-cell"><strong>${escaped(row.label)}</strong><small>${escaped(row.name)} · ${escaped(row.type)}</small></div></td>
       <td>${annotationText(row.annotation)}</td>
       <td class="numeric">${escaped(valueText(row))}</td>
       <td class="wire-value">${escaped(row.value_hex)}</td>
@@ -429,7 +429,13 @@ function renderPhysicalStatus(carrier) {
   const profile = carrier.profile;
   elements.radioCard.hidden = false;
   elements.radioProfile.textContent = profile.id;
+  elements.radioDevices.textContent = `${profile.spi_device} · ${profile.gpio_chip}`;
   elements.radioFrequency.textContent = `${profile.frequency_mhz.toFixed(1)} MHz`;
+  elements.radioChannel.textContent = `band ${profile.band} · channel ${profile.channel} · ${profile.transmit_power_dbm} dBm`;
+  elements.radioAddress.textContent = profile.physical_address_hex;
+  elements.radioCrc.textContent = `${profile.crc_bits}-bit hardware CRC`;
+  const pins = carrier.pins || {};
+  elements.radioPins.textContent = `CD ${Number(Boolean(pins.carrier_detect))} · AM ${Number(Boolean(pins.address_match))} · DR ${Number(Boolean(pins.data_ready))}`;
   elements.transmitButton.disabled = !carrier.can_transmit;
   elements.transmitConfirm.disabled = !carrier.can_transmit;
   elements.carrierStatus.innerHTML = `<i></i> ${escaped(carrier.label)} · listening`;

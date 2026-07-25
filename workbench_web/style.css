@@ -61,7 +61,7 @@ html[data-text-size="extra-large"] { font-size: 17px; }
 html {
   min-width: 320px;
   height: 100vh;
-  overflow: hidden;
+  overflow: auto;
   background-color: var(--ground);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
@@ -72,7 +72,7 @@ html {
 body {
   margin: 0;
   height: 100vh;
-  overflow: hidden;
+  overflow: auto;
   color: var(--ink);
   font-size: var(--text-base);
   font-family: var(--font-body);
@@ -264,15 +264,15 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   background: rgba(183, 238, 104, 0.06);
 }
 
-/* Main Workspace 3-Column Dashboard Grid (Zero Scroll) */
+/* Main Workspace: a persistent three-column operating surface. */
 .workspace {
   flex: 1;
-  height: calc(100vh - 64px);
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(420px, 1.4fr) minmax(320px, 1fr);
   gap: 16px;
   padding: 16px 20px;
-  overflow: hidden;
+  overflow: auto;
   box-sizing: border-box;
 }
 
@@ -283,15 +283,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   min-height: 0;
   height: 100%;
   overflow: hidden;
-}
-
-@media (max-width: 1100px) {
-  .workspace {
-    grid-template-columns: minmax(300px, 1fr) minmax(360px, 1.3fr);
-  }
-  .col-tools {
-    display: none;
-  }
 }
 
 .library-heading {
@@ -1301,7 +1292,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 
 .result-summary {
-  display: none;
+  display: block;
   margin: 6px 0 0;
   color: var(--muted);
   font-size: var(--text-base);
@@ -1956,18 +1947,6 @@ td small {
 }
 
 /* Responsive Media Queries */
-@media (max-width: 900px) {
-  .workspace {
-    grid-template-columns: 260px minmax(0, 1fr);
-  }
-  .inspector {
-    padding: 24px 20px 48px;
-  }
-  .truth-card {
-    display: none;
-  }
-}
-
 @media (max-width: 720px) {
   .topbar {
     padding: 12px 16px;
@@ -1978,37 +1957,6 @@ td small {
     justify-content: space-between;
   }
   .workspace {
-    display: block;
-  }
-  .library {
-    height: auto;
-    position: static;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-  }
-  .example-list {
-    max-height: 240px;
-  }
-  .inspector {
-    padding: 20px 14px 48px;
-  }
-  .replay-picker-row {
-    grid-template-columns: 1fr;
-  }
-  .schedule-item {
-    grid-template-columns: 50px 20px 1fr;
-  }
-  .schedule-note {
-    grid-column: 3;
-  }
-  .route {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-  .route-end.destination {
-    text-align: left;
-  }
-  .route-path {
-    display: none;
+    padding: 12px;
   }
 }
