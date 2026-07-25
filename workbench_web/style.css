@@ -528,20 +528,40 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   box-sizing: border-box;
 }
 
-.input-card {
-  flex: 1 1 auto;
+.col-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   min-height: 0;
-  max-height: calc(100% - 180px);
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  padding-right: 4px;
+}
+
+.input-card {
+  flex: 1 1 55%;
+  min-height: 220px;
+  max-height: 58%;
 }
 
 .journal-card {
-  flex: 0 0 auto;
-  min-height: 160px;
-  max-height: 220px;
+  flex: 1 1 42%;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .result {
   flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
 }
 
 .replay-card {
@@ -1678,13 +1698,19 @@ td small {
 
 /* Section 4: Recent Packets Journal & Badges */
 .journal-card {
-  padding: 20px 24px;
+  padding: 16px 20px;
 }
 
 .journal-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  padding-right: 4px;
 }
 
 .journal-entry {
