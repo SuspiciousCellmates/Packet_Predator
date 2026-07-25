@@ -369,6 +369,7 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
         "docs/adr/0003-begin-layered-workbench-runtime.md",
         "docs/adr/0004-begin-deterministic-replay.md",
         "docs/adr/0005-begin-nrf905-physical-validation.md",
+        "docs/adr/0006-decouple-physical-receive-from-browser.md",
         "docs/nrf905-two-pi-bench.md",
         "config/nrf905-bench.example.json",
         "requirements-rpi.txt",
@@ -401,7 +402,7 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
         raise GuardError("layered milestone must retain but supersede the all-runtime freeze")
     if (
         freeze.get("replacement_requires_adr") is not True
-        or freeze.get("replacement_adr") != "docs/adr/0005-begin-nrf905-physical-validation.md"
+        or freeze.get("replacement_adr") != "docs/adr/0006-decouple-physical-receive-from-browser.md"
         or freeze.get("legacy_files_remain_immutable") is not True
     ):
         raise GuardError("archived runtime preservation rule is invalid")
@@ -415,6 +416,8 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
         "default_transport": "inspect-only",
         "replay_startup": "explicit-selection-only",
         "physical_startup": "explicit-profile-only",
+        "physical_receive_lifecycle": "application-owned-signal-driven",
+        "browser_physical_receive": "model-events-only",
         "packet_transmission_allowed": "explicit-profile-and-request-confirmation",
         "hardware_imports_allowed": ["packet_predator/adapters/nrf905_linux.py"],
         "autonomous_actors_allowed": False,

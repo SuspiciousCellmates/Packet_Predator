@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
+from contextlib import asynccontextmanager
 from functools import lru_cache
+import json
 import os
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -67,10 +70,28 @@ def _unavailable(exc: Exception) -> JSONResponse:
     )
 
 
+@asynccontextmanager
+async def _lifespan(application: FastAPI):
+    service = None
+    try:
+        service = _service()
+        service.start()
+        application.state.startup_error = None
+    except _CONFIGURATION_ERRORS as exc:
+        application.state.startup_error = exc
+    try:
+        yield
+    finally:
+        if service is not None:
+            service.close()
+        _service.cache_clear()
+
+
 app = FastAPI(
     title="Packet Predator",
     description="Local packet inspection, deterministic replay, and explicit physical-adapter workbench",
-    version="0.2.0",
+    version="0.3.0",
+    lifespan=_lifespan,
 )
 
 
@@ -134,6 +155,68 @@ async def inspection(identifier: str):
     return item
 
 
+@app.get("/api/workbench/state")
+async def workbench_state():
+    try:
+        return _service().model_state()
+    except _CONFIGURATION_ERRORS as exc:
+        return _unavailable(exc)
+
+
+@app.get("/api/workbench/events")
+async def workbench_events(request: Request, after: int = 0):
+    try:
+        service = _service()
+    except _CONFIGURATION_ERRORS as exc:
+        return _unavailable(exc)
+
+    header_revision = request.headers.get("last-event-id")
+    if header_revision and header_revision.isdecimal():
+        after = max(after, int(header_revision))
+    after = max(0, after)
+
+    async def stream():
+        revision = after
+        loop = asyncio.get_running_loop()
+        changed = asyncio.Event()
+        unsubscribe = service.subscribe_to_model(
+            lambda _: loop.call_soon_threadsafe(changed.set)
+        )
+        try:
+            yield "retry: 1000\n\n"
+            while True:
+                if await request.is_disconnected():
+                    return
+                changed.clear()
+                result = service.model_changes(revision)
+                if result["resync"]:
+                    revision = result["revision"]
+                    payload = json.dumps({"revision": revision}, separators=(",", ":"))
+                    yield f"id: {revision}\nevent: resync\ndata: {payload}\n\n"
+                    continue
+                if result["changes"]:
+                    for change in result["changes"]:
+                        revision = change["revision"]
+                        payload = json.dumps(change, separators=(",", ":"))
+                        yield f"id: {revision}\nevent: model\ndata: {payload}\n\n"
+                    continue
+                try:
+                    await asyncio.wait_for(changed.wait(), timeout=15.0)
+                except TimeoutError:
+                    yield ": keep-alive\n\n"
+        finally:
+            unsubscribe()
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @app.get("/api/replays")
 async def replays():
     try:
@@ -170,20 +253,6 @@ async def replay_state():
         return JSONResponse(status_code=422, content={"error": exc.as_dict()})
     except _CONFIGURATION_ERRORS as exc:
         return _unavailable(exc)
-
-
-@app.post("/api/carrier/poll")
-async def poll_carrier():
-    try:
-        service = _service()
-    except _CONFIGURATION_ERRORS as exc:
-        return _unavailable(exc)
-    try:
-        return service.poll_physical()
-    except (TransportError, Nrf905Error) as exc:
-        return JSONResponse(status_code=422, content={"error": exc.as_dict()})
-    except service.wire.codec_error as exc:
-        return JSONResponse(status_code=422, content={"error": exc.as_dict()})
 
 
 @app.post("/api/carrier/transmit")

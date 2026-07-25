@@ -196,7 +196,41 @@ Direct LAN access is also available:
 
 Then open `http://PI_ADDRESS:8000`. The workbench currently has no login. Use direct LAN binding only on a trusted development network and do not expose it to the internet.
 
-When a profile is active, the browser shows a physical-adapter panel and polls for received frames. Transmission requires both `transmit_enabled: true` in the profile and a one-shot confirmation checkbox in the page. These are accident barriers, not authentication.
+When a profile is active, application startup begins a dedicated receiver that
+waits on the nRF905 `DR` signal and writes observations into the process-local
+workbench model. It runs before and independently of any browser connection.
+The browser reads the current model, then uses a server-sent event stream to
+learn when it changed; it never polls the radio. A slow or reconnecting page
+cannot apply backpressure to capture.
+
+Transmission requires both `transmit_enabled: true` in the profile and a
+one-shot confirmation checkbox in the page. Receive, transmit, and shutdown
+operations are serialized, and the adapter returns to receive mode immediately
+after a transmit attempt. These are accident barriers, not authentication.
+
+### Continuous-receive follow-up still required
+
+The original exact one-frame exchange passed on 2026-07-24. After that test,
+browser-driven 50 ms receive polling was found to miss a follow-up frame. ADR
+0006 removes that window in software and adds deterministic queued-frame and
+transmit-to-receive tests.
+
+Follow the copy-paste commands and evidence checklist in
+[continuous-receive physical revalidation](continuous-receive-revalidation.md).
+
+Before closing the physical milestone, use Packet Predator to send the
+enrolled endpoint's `NODE_HELLO` through the real Radio Gateway to the Game
+Controller. Packet Predator must capture both naturally consecutive Controller
+responses: `HELLO_RESULT(CAPABILITIES_REQUIRED)`, then
+`CAPABILITY_REQUEST`. Run with the receiving browser unopened, open, and
+reconnecting. Do not add transmitter delay, retry, or scheduling behavior.
+Record the exact frame order, byte equality, sample count, and any loss in the
+dated validation result. Until that run is recorded, do not describe
+continuous follow-up reception as physically passed.
+
+Controlled inter-packet gaps may be characterized separately after the unchanged
+exchange passes. Such measurements do not authorize production transmit
+spacing or retry behavior.
 
 ## Failure meanings
 

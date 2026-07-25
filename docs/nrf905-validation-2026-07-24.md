@@ -2,6 +2,10 @@
 
 Status: passed in both directions on the two available Raspberry Pi 5 and original Packet Predator nRF905 HAT benches.
 
+Continuous-receive follow-up status: software implemented on 2026-07-25;
+physical Game Controller `HELLO_RESULT` plus `CAPABILITY_REQUEST`
+revalidation not yet run.
+
 ## Purpose
 
 This result closes the physical-evidence portion of ADR 0005. It proves that these two benches can transmit and receive exact, fixed 32-byte Protocol Contract `1.0.1` frames through the isolated nRF905 adapter. It does not make nRF905 a permanent platform choice or establish venue range, congestion, or timing limits.
@@ -102,5 +106,30 @@ It does not yet prove:
 - long-duration stability;
 - interoperability with future embedded node firmware; or
 - that nRF905 is the final transport choice.
+
+## Continuous-receive follow-up
+
+The first browser integration serviced the receive FIFO only when the page made
+a request every 50 ms. Later testing missed a follow-up frame, so the successful
+single-frame evidence above does not validate burst or follow-up capture.
+
+ADR 0006 replaces that browser-paced path with an application-lifecycle
+receiver waiting on the nRF905 `DR` signal. Frames enter a thread-safe
+process-local model before any browser presentation. Software tests now prove
+ordered queued follow-ups without a browser, immediate transmit-to-receive
+handoff, continued capture after a codec-invalid frame, visible adapter faults,
+subscriber resynchronization, and idempotent shutdown.
+
+No new physical result is claimed here. On the real Packet Predator–Radio
+Gateway–Game Controller path, Packet Predator must send an enrolled
+`NODE_HELLO` and capture the Controller's naturally consecutive
+`HELLO_RESULT(CAPABILITIES_REQUIRED)` and `CAPABILITY_REQUEST`. Run with the
+browser unopened, open, and reconnecting. Do not add transmitter delay, retry,
+or scheduling behavior. Append the sample count, exact order, byte comparisons,
+and observed loss here when that test is run.
+
+Controlled-gap tests may follow as a separate characterization exercise after
+the unchanged exchange passes. They are not part of this acceptance gate and do
+not establish a production transmit-spacing policy.
 
 The repeatable setup and full diagnostic walkthrough remain in [the two-Pi bench guide](nrf905-two-pi-bench.md).

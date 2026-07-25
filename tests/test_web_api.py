@@ -3,6 +3,8 @@ import json
 import unittest
 from pathlib import Path
 
+from fastapi import Request
+
 from packet_predator import web
 from packet_predator.web import app
 
@@ -66,8 +68,8 @@ class WebApiTests(unittest.TestCase):
         self.assertIn(b"Hardware-free inspection", body)
         self.assertIn(b'id="textSizePreference"', body)
         self.assertIn(b'id="fontPreference"', body)
-        self.assertIn(b"/assets/style.css?v=20260725-2", body)
-        self.assertIn(b"/assets/app.js?v=20260725-2", body)
+        self.assertIn(b"/assets/style.css?v=20260725-3", body)
+        self.assertIn(b"/assets/app.js?v=20260725-3", body)
         self.assertNotIn(b"localhost:8400", body)
         self.assertIn(b'id="resultSummary" hidden', body)
         self.assertLess(body.index(b'id="inputHeading"'), body.index(b'id="resultPanel"'))
@@ -78,6 +80,9 @@ class WebApiTests(unittest.TestCase):
         self.assertIn("elements.resultTitle.textContent = item.meaning.name;", app_source)
         self.assertIn("elements.radioDevices.textContent", app_source)
         self.assertIn("escaped(row.name)", app_source)
+        self.assertIn("new EventSource(", app_source)
+        self.assertNotIn("/api/carrier/poll", app_source)
+        self.assertNotIn("setInterval(pollRadio, 50)", app_source)
 
     def test_status_is_explicitly_inspect_only(self):
         status, _, body = asyncio.run(asgi_request("GET", "/api/status"))
@@ -163,8 +168,7 @@ class WebApiTests(unittest.TestCase):
 
     def test_physical_routes_fail_clearly_in_default_inspect_only_mode(self):
         status, _, body = asyncio.run(asgi_request("POST", "/api/carrier/poll"))
-        self.assertEqual(status, 422)
-        self.assertEqual(json.loads(body)["error"]["code"], "PHYSICAL_ADAPTER_UNAVAILABLE")
+        self.assertEqual(status, 404)
 
         status, _, body = asyncio.run(
             asgi_request(
@@ -175,6 +179,138 @@ class WebApiTests(unittest.TestCase):
         )
         self.assertEqual(status, 422)
         self.assertEqual(json.loads(body)["error"]["code"], "TRANSMIT_CONFIRMATION_REQUIRED")
+
+    def test_workbench_model_snapshot_is_the_presentation_authority(self):
+        example = web._service().examples()["examples"][0]
+        asyncio.run(
+            asgi_request(
+                "POST",
+                "/api/v1/inspect",
+                {
+                    "frame_hex": example["frame_hex"],
+                    "mode": "logical",
+                    "origin": "model API test",
+                },
+            )
+        )
+
+        status, _, body = asyncio.run(asgi_request("GET", "/api/workbench/state"))
+        result = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(result["revision"], 1)
+        self.assertEqual(result["journal"]["count"], 1)
+        self.assertEqual(result["latest"]["origin"], "model API test")
+        self.assertEqual(result["receiver"]["state"], "stopped")
+
+    def test_model_event_stream_route_is_registered(self):
+        paths = {getattr(route, "path", None) for route in app.routes}
+        self.assertIn("/api/workbench/events", paths)
+
+    def test_model_event_stream_emits_revision_notifications(self):
+        service = web._service()
+        example = service.examples()["examples"][0]
+        service.inspect(example["frame_hex"], "logical", "stream API test")
+
+        async def exercise_stream():
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            request = Request(
+                {
+                    "type": "http",
+                    "method": "GET",
+                    "path": "/api/workbench/events",
+                    "headers": [],
+                    "query_string": b"after=0",
+                },
+                receive,
+            )
+            response = await web.workbench_events(request, after=0)
+            iterator = response.body_iterator
+            retry = await anext(iterator)
+            event = await anext(iterator)
+            await iterator.aclose()
+            return retry, event
+
+        retry, event = asyncio.run(exercise_stream())
+        self.assertEqual(retry, "retry: 1000\n\n")
+        self.assertIn("id: 1\nevent: model\n", event)
+        self.assertIn('"kind":"observation"', event)
+        self.assertEqual(len(service.model._subscribers), 0)
+
+    def test_model_event_stream_requests_resync_for_a_future_revision(self):
+        service = web._service()
+
+        async def exercise_stream():
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            request = Request(
+                {
+                    "type": "http",
+                    "method": "GET",
+                    "path": "/api/workbench/events",
+                    "headers": [],
+                    "query_string": b"after=99",
+                },
+                receive,
+            )
+            response = await web.workbench_events(request, after=99)
+            iterator = response.body_iterator
+            await anext(iterator)
+            event = await anext(iterator)
+            await iterator.aclose()
+            return event
+
+        event = asyncio.run(exercise_stream())
+        self.assertIn("id: 0\nevent: resync\n", event)
+        self.assertIn('"revision":0', event)
+        self.assertEqual(len(service.model._subscribers), 0)
+
+    def test_model_event_stream_wakes_for_a_new_observation(self):
+        service = web._service()
+        example = service.examples()["examples"][0]
+
+        async def exercise_stream():
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            request = Request(
+                {
+                    "type": "http",
+                    "method": "GET",
+                    "path": "/api/workbench/events",
+                    "headers": [],
+                    "query_string": b"after=0",
+                },
+                receive,
+            )
+            response = await web.workbench_events(request, after=0)
+            iterator = response.body_iterator
+            await anext(iterator)
+            pending = asyncio.create_task(anext(iterator))
+            await asyncio.sleep(0)
+            service.inspect(example["frame_hex"], "logical", "live stream wake test")
+            event = await asyncio.wait_for(pending, 1.0)
+            await iterator.aclose()
+            return event
+
+        event = asyncio.run(exercise_stream())
+        self.assertIn("event: model", event)
+        self.assertIn('"kind":"observation"', event)
+        self.assertEqual(len(service.model._subscribers), 0)
+
+    def test_application_lifespan_owns_and_releases_the_service(self):
+        original = web._service()
+
+        async def exercise_lifespan():
+            async with web._lifespan(app):
+                self.assertIs(web._service(), original)
+                self.assertFalse(original._closed)
+
+        asyncio.run(exercise_lifespan())
+        self.assertTrue(original._closed)
+        self.assertIsNot(web._service(), original)
 
 
 if __name__ == "__main__":

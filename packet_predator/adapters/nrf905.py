@@ -32,6 +32,8 @@ class DigitalLines(Protocol):
 
     def get(self, name: str) -> bool: ...
 
+    def wait(self, name: str, timeout_s: float) -> bool: ...
+
     def close(self) -> None: ...
 
 
@@ -104,11 +106,19 @@ class Nrf905Device:
             }
 
     def pin_status(self) -> dict[str, bool]:
-        return {
-            "carrier_detect": self.lines.get("carrier_detect"),
-            "address_match": self.lines.get("address_match"),
-            "data_ready": self.lines.get("data_ready"),
-        }
+        with self._lock:
+            return {
+                "carrier_detect": self.lines.get("carrier_detect"),
+                "address_match": self.lines.get("address_match"),
+                "data_ready": self.lines.get("data_ready"),
+            }
+
+    def wait_data_ready(self, timeout_s: float) -> bool:
+        """Wait for receive readiness without holding the SPI/mode lock."""
+        self._require_started()
+        if self.lines.get("data_ready"):
+            return True
+        return self.lines.wait("data_ready", timeout_s)
 
     def receive(self) -> bytes | None:
         with self._lock:

@@ -1,5 +1,8 @@
+from collections import deque
 import json
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -33,20 +36,38 @@ class FakeLines:
         self.inputs = {"carrier_detect": False, "address_match": False, "data_ready": False}
         self.history = []
         self.closed = False
+        self.close_count = 0
+        self.wait_error = None
+        self.condition = threading.Condition()
 
     def set(self, name, active):
+        previous = self.outputs[name]
         self.outputs[name] = active
         self.history.append((name, active))
         if name == "trx_ce" and active and self.outputs["tx_en"]:
-            self.inputs["data_ready"] = True
-        if name == "tx_en" and not active:
-            self.inputs["data_ready"] = False
+            self.set_input("data_ready", True)
+        if name == "tx_en" and previous and not active:
+            self.set_input("data_ready", False)
 
     def get(self, name):
-        return self.inputs[name]
+        with self.condition:
+            return self.inputs[name]
+
+    def wait(self, name, timeout_s):
+        if self.wait_error is not None:
+            raise self.wait_error
+        with self.condition:
+            self.condition.wait_for(lambda: self.inputs[name], timeout_s)
+            return self.inputs[name]
+
+    def set_input(self, name, active):
+        with self.condition:
+            self.inputs[name] = active
+            self.condition.notify_all()
 
     def close(self):
         self.closed = True
+        self.close_count += 1
 
 
 class FakeSpi:
@@ -55,6 +76,8 @@ class FakeSpi:
         self.tx_address = b""
         self.tx_frame = b""
         self.rx_frame = bytes(32)
+        self.rx_frames = deque()
+        self.lines = None
         self.mismatch = False
         self.closed = False
 
@@ -75,8 +98,16 @@ class FakeSpi:
             self.tx_frame = bytes(outgoing[1:])
             return bytes(len(outgoing))
         if command == 0x24:
-            return bytes([0]) + self.rx_frame[: len(outgoing) - 1]
+            frame = self.rx_frames.popleft() if self.rx_frames else self.rx_frame
+            if self.lines is not None:
+                self.lines.set_input("data_ready", bool(self.rx_frames))
+            return bytes([0]) + frame[: len(outgoing) - 1]
         raise AssertionError(f"unexpected SPI command 0x{command:02x}")
+
+    def queue_receive(self, *frames):
+        self.rx_frames.extend(frames)
+        if self.lines is not None:
+            self.lines.set_input("data_ready", True)
 
     def close(self):
         self.closed = True
@@ -153,6 +184,7 @@ class DeviceTests(unittest.TestCase):
         self.clock = ManualClock()
         self.spi = FakeSpi()
         self.lines = FakeLines()
+        self.spi.lines = self.lines
         self.device = Nrf905Device(
             self.profile,
             self.spi,
@@ -217,6 +249,21 @@ class DeviceTests(unittest.TestCase):
         self.assertEqual(captured.frame_mode, "fixed")
         self.assertEqual(transport.status()["mode"], "nrf905")
 
+    def test_transport_status_remains_available_when_pin_read_fails(self):
+        transport = Nrf905Transport(self.profile, self.device, self.clock)
+        original_get = self.lines.get
+
+        def failing_get(name):
+            raise Nrf905Error("NRF905_GPIO_READ", f"cannot read {name}")
+
+        self.lines.get = failing_get
+        status = transport.status()
+        self.lines.get = original_get
+
+        self.assertEqual(status["mode"], "nrf905")
+        self.assertEqual(status["pins"], {})
+        self.assertEqual(status["status_error"]["code"], "NRF905_GPIO_READ")
+
 
 @unittest.skipUnless(
     (AUTHORITY_ROOT / "registry/v1.json").is_file(),
@@ -228,6 +275,7 @@ class PhysicalServiceTests(unittest.TestCase):
         self.clock = ManualClock()
         self.spi = FakeSpi()
         self.lines = FakeLines()
+        self.spi.lines = self.lines
         device = Nrf905Device(
             self.profile, self.spi, self.lines, sleeper=self.clock.sleep, monotonic=self.clock
         )
@@ -236,7 +284,7 @@ class PhysicalServiceTests(unittest.TestCase):
         self.service = WorkbenchService(self.wire, carrier=self.transport)
 
     def tearDown(self):
-        self.transport.close()
+        self.service.close()
         self.directory.cleanup()
 
     def test_service_requires_confirmation_and_sends_padded_contract_bytes(self):
@@ -252,13 +300,87 @@ class PhysicalServiceTests(unittest.TestCase):
 
     def test_service_decodes_and_journals_exact_received_frame(self):
         expected = self.wire.resolve_example("v1-node-status", "fixed")
-        self.spi.rx_frame = bytes.fromhex(expected["frame_hex"])
-        self.lines.inputs["data_ready"] = True
+        self.service.start()
+        self.spi.queue_receive(bytes.fromhex(expected["frame_hex"]))
 
-        result = self.service.poll_physical()
-        self.assertEqual(result["delivered"][0]["meaning"]["name"], "NODE_STATUS")
-        self.assertEqual(result["delivered"][0]["received_frame_hex"], expected["frame_hex"])
+        self._wait_for_journal_count(1)
+        result = self.service.model_state()
+        self.assertEqual(result["latest"]["meaning"]["name"], "NODE_STATUS")
+        self.assertEqual(result["latest"]["received_frame_hex"], expected["frame_hex"])
         self.assertEqual(self.service.journal()["count"], 1)
+
+    def test_receiver_captures_follow_up_frames_without_a_browser(self):
+        first = self.wire.resolve_example("v1-controller-beacon", "fixed")
+        second = self.wire.resolve_example("v1-node-status", "fixed")
+        self.service.start()
+        self.spi.queue_receive(
+            bytes.fromhex(first["frame_hex"]),
+            bytes.fromhex(second["frame_hex"]),
+        )
+
+        self._wait_for_journal_count(2)
+        entries = self.service.journal()["entries"]
+        self.assertEqual(
+            [entry["received_frame_hex"] for entry in reversed(entries)],
+            [first["frame_hex"], second["frame_hex"]],
+        )
+        self.assertEqual(self.service.model_state()["receiver"]["received_count"], 2)
+
+    def test_invalid_frame_is_retained_and_receiver_continues(self):
+        valid = self.wire.resolve_example("v1-node-status", "fixed")
+        self.service.start()
+        self.spi.queue_receive(bytes(32), bytes.fromhex(valid["frame_hex"]))
+
+        self._wait_for_journal_count(2)
+        entries = list(reversed(self.service.journal()["entries"]))
+        self.assertEqual(entries[0]["inspection_error"]["code"], "UNSUPPORTED_WIRE_GENERATION")
+        self.assertEqual(entries[1]["title"], "Node status")
+        self.assertEqual(self.service.model_state()["receiver"]["invalid_count"], 1)
+        self.assertTrue(self.service._receiver.running)
+
+    def test_transmit_handoff_returns_immediately_to_receive(self):
+        outbound = self.wire.resolve_example("v1-controller-beacon", "logical")
+        follow_up = self.wire.resolve_example("v1-node-status", "fixed")
+        self.service.start()
+
+        self.service.transmit(outbound["frame_hex"], "logical", True)
+        self.spi.queue_receive(bytes.fromhex(follow_up["frame_hex"]))
+
+        self._wait_for_journal_count(2)
+        entries = list(reversed(self.service.journal()["entries"]))
+        self.assertEqual([entry["capture"]["direction"] for entry in entries], ["sent", "received"])
+        self.assertEqual(entries[1]["received_frame_hex"], follow_up["frame_hex"])
+        self.assertEqual(self.service.model_state()["receiver"]["state"], "listening")
+
+    def test_adapter_fault_is_published_without_a_retry_loop(self):
+        self.lines.wait_error = Nrf905Error("NRF905_GPIO_WAIT", "simulated wait failure")
+        self.service.start()
+
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            receiver = self.service.model_state()["receiver"]
+            if receiver["state"] == "faulted":
+                break
+            time.sleep(0.005)
+        else:
+            self.fail("receiver fault was not published")
+
+        self.assertEqual(receiver["last_error"]["code"], "NRF905_GPIO_WAIT")
+        self.assertFalse(self.service._receiver.running)
+
+    def test_close_is_idempotent_and_releases_hardware_once(self):
+        self.service.start()
+        self.service.close()
+        self.service.close()
+        self.assertEqual(self.lines.close_count, 1)
+
+    def _wait_for_journal_count(self, expected):
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            if self.service.journal()["count"] >= expected:
+                return
+            time.sleep(0.005)
+        self.fail(f"receiver did not journal {expected} frames")
 
 
 if __name__ == "__main__":

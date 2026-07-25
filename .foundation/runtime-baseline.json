@@ -2,7 +2,7 @@
   "schema_version": 1,
   "status": "active-nrf905-validation",
   "milestone_id": "nrf905-physical-adapter-validation",
-  "replacement_adr": "docs/adr/0005-begin-nrf905-physical-validation.md",
+  "replacement_adr": "docs/adr/0006-decouple-physical-receive-from-browser.md",
   "protocol_authority": "../Protocol_Contract",
   "supported_entrypoint": "packet_predator.web:app",
   "supported_runtime": {
@@ -13,7 +13,9 @@
     "adapter_root": "packet_predator/adapters",
     "adapter_profile": "packet_predator/nrf905_profile.py",
     "physical_transport": "packet_predator/nrf905_transport.py",
+    "physical_receiver": "packet_predator/receiver.py",
     "service": "packet_predator/service.py",
+    "presentation_model": "packet_predator/model.py",
     "web": "packet_predator/web.py",
     "static_root": "workbench_web",
     "recording_root": "recordings"
@@ -22,6 +24,8 @@
   "available_transports": ["inspect-only", "deterministic-replay", "nrf905"],
   "replay_startup": "explicit-selection-only",
   "physical_startup": "explicit-profile-only",
+  "physical_receive_lifecycle": "application-owned-signal-driven",
+  "browser_physical_receive": "model-events-only",
   "packet_transmission_allowed": "explicit-profile-and-request-confirmation",
   "hardware_imports_allowed": ["packet_predator/adapters/nrf905_linux.py"],
   "autonomous_actors_allowed": false,

@@ -51,7 +51,12 @@ This is the normal and safest starting mode. You can examine examples and play r
 
 ### `Live nRF905`
 
-Packet Predator was deliberately started with a radio configuration. It listens for real frames. It can transmit only if transmission was also enabled in that configuration, and the person using the page confirms each transmission individually.
+Packet Predator was deliberately started with a radio configuration. The
+server listens for real frames continuously, including while no browser is
+open. The page subscribes to the server's temporary observation model rather
+than asking the radio to check for one frame at a time. It can transmit only if
+transmission was also enabled in that configuration, and the person using the
+page confirms each transmission individually.
 
 ### `Contract 1.x.x`
 
@@ -177,7 +182,20 @@ ssh -L 8001:127.0.0.1:8000 your-user@packet-predator-a.local
 
 Keep that terminal open and visit [http://127.0.0.1:8001](http://127.0.0.1:8001). Replace `your-user` with the username created while setting up the Pi.
 
-When a real frame arrives, it appears in the inspection view and journal. Packet Predator does not automatically reply.
+When a real frame arrives, the server puts it in the temporary observation
+model immediately. An open browser receives a live notification and shows it
+in the inspection view and journal. Closing or reconnecting the browser does
+not stop or slow radio reception, and Packet Predator does not automatically
+reply.
+
+The live-view connection and the radio receiver are separate. If the page says
+that its live view is reconnecting, the Pi continues listening and the page
+resynchronizes from the retained journal when its connection returns.
+
+If radio bytes pass the hardware address and CRC checks but do not form a valid
+Protocol Contract message, Packet Predator retains their exact hexadecimal
+bytes and shows a structured decode error. One bad frame does not stop later
+valid frames from being captured.
 
 To send a frame from the browser:
 

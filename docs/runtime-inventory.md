@@ -9,9 +9,10 @@ The archived prototype files remain immutable evidence. The supported layered ru
 | v1 frame decode and fixture catalog | `packet_predator/wire_adapter.py` | Delegates to sibling Protocol Contract `1.0.1`; defines no shared values |
 | Recording catalogue | `packet_predator/replay.py`, `recordings/` | Finite ordered fixture references with validated timing; no executable scenario behavior |
 | Hardware-free transports | `packet_predator/transport.py` | Inspect-only startup plus explicitly selected deterministic replay; neither transmits |
-| Experimental nRF905 transport | `packet_predator/adapters/`, `packet_predator/nrf905_profile.py`, `packet_predator/nrf905_transport.py` | Explicit profile only; exact register readback, capture, and individually confirmed manual transmission; no message semantics or automatic reply |
-| Inspection history | `packet_predator/service.py` | Process-local manual, fixture, and replay observations only; no game state |
-| JSON/static application | `packet_predator/web.py`, `workbench_web/` | Thin routes and browser presentation |
+| Experimental nRF905 transport | `packet_predator/adapters/`, `packet_predator/nrf905_profile.py`, `packet_predator/nrf905_transport.py` | Explicit profile only; exact register readback, signal-driven capture, and individually confirmed manual transmission; no message semantics or automatic reply |
+| Physical receive lifecycle | `packet_predator/receiver.py` | Application-owned worker waits for `DR` and feeds opaque frames to the service independently of browser connections |
+| Inspection history/model | `packet_predator/service.py`, `packet_predator/model.py` | Process-local newest-100 observations, receiver state, and revision notifications only; no game state |
+| JSON/static application | `packet_predator/web.py`, `workbench_web/` | Thin command/snapshot/SSE routes and a browser view that never drives physical receive |
 
 ## Keep as archived workbench intent
 
@@ -28,7 +29,7 @@ The archived prototype files remain immutable evidence. The supported layered ru
 | Capability/module | Replacement direction |
 |---|---|
 | Local `PayloadType`, `EVENT_TYPES`, `NodeType`, settings, and layouts | Replaced in the supported entrypoint by the sibling reference codec; retained only as v0 evidence |
-| `RadioManager` global lifecycle and direct protocol knowledge | Replaced for physical validation by an isolated nRF905 adapter behind the opaque-frame boundary; the archived manager remains unused |
+| `RadioManager` global lifecycle and direct protocol knowledge | Replaced for physical validation by an isolated nRF905 adapter, application-lifecycle receiver, service, and model behind the opaque-frame boundary; the archived manager remains unused |
 | `driver/virtual_airwaves.py` | Replaced for supported use by the deterministic opaque-frame replay transport; legacy file retained as evidence |
 | Monolithic `web_app.py` | Replaced for supported use by wire adapter, transport, service, and thin web layers |
 | Implicit hardware-versus-simulation selection | Replaced by explicit visible inspect-only status; adapter selection remains later work |

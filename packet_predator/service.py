@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import threading
-from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 
+from .model import WorkbenchModel
 from .replay import Recording, RecordingCatalog
 from .nrf905_transport import Nrf905Transport
+from .receiver import PhysicalReceiver
 from .transport import CarrierFrame, DeterministicReplayTransport, InspectOnlyTransport, ReceiveTransport, TransportError
 from .wire_adapter import WireAdapter
 
@@ -24,29 +25,56 @@ class WorkbenchService:
         carrier: ReceiveTransport | None = None,
         replay_carrier: DeterministicReplayTransport | None = None,
         recording_root: Path | None = None,
+        model: WorkbenchModel | None = None,
     ) -> None:
         self.wire = wire or WireAdapter()
         self.carrier = carrier or InspectOnlyTransport()
         self.replay_carrier = replay_carrier or DeterministicReplayTransport()
+        self.model = model or WorkbenchModel()
         root = recording_root or Path(__file__).resolve().parents[1] / "recordings"
         self.recordings = RecordingCatalog(root, self.wire.version, self.wire.resolve_example)
         self._active_recording: Recording | None = None
-        self._entries: deque[dict[str, Any]] = deque(maxlen=100)
         self._lock = threading.RLock()
+        self._closed = False
+        self._receiver = (
+            PhysicalReceiver(self.carrier, self.consume_physical, self.model.set_receiver_state)
+            if isinstance(self.carrier, Nrf905Transport)
+            else None
+        )
+
+    def start(self) -> None:
+        with self._lock:
+            if self._closed:
+                raise RuntimeError("A closed workbench service cannot be restarted.")
+            receiver = self._receiver
+        if receiver is not None:
+            receiver.start()
+
+    def close(self) -> None:
+        with self._lock:
+            if self._closed:
+                return
+            receiver = self._receiver
+        if receiver is not None:
+            receiver.stop()
+            self.carrier.close()
+        with self._lock:
+            self._closed = True
 
     def status(self) -> dict[str, Any]:
         with self._lock:
-            count = len(self._entries)
             active = self._active_recording is not None
+        snapshot = self.model.snapshot()
         return {
             "ready": True,
             "workbench": "Packet Predator",
             "carrier": self.replay_carrier.status() if active else self.carrier.status(),
             "authority": self.wire.status(),
-            "journal_entries": count,
+            "journal_entries": snapshot["journal"]["count"],
             "replay_available": True,
             "recording_count": len(self.recordings.list()),
             "physical_adapter": self.carrier.status() if isinstance(self.carrier, Nrf905Transport) else None,
+            "receiver": snapshot["receiver"],
         }
 
     def catalog(self) -> dict[str, Any]:
@@ -96,11 +124,6 @@ class WorkbenchService:
     def replay_state(self) -> dict[str, Any]:
         return self._replay_response(self.replay_carrier.poll())
 
-    def poll_physical(self) -> dict[str, Any]:
-        carrier = self._physical_carrier()
-        delivered = [self._consume_physical(item) for item in carrier.poll()]
-        return {"carrier": carrier.status(), "delivered": delivered}
-
     def transmit(self, frame_text: str, mode: str, confirmed: bool) -> dict[str, Any]:
         if not confirmed:
             raise TransportError(
@@ -109,29 +132,34 @@ class WorkbenchService:
             )
         carrier = self._physical_carrier()
         frame = self.wire.fixed_frame(frame_text, mode)
-        delivered = self._consume_physical(carrier.send(frame))
+        receiver_running = self._receiver is not None and self._receiver.running
+        if receiver_running:
+            self.model.set_receiver_state("transmitting")
+        try:
+            delivered = self.consume_physical(carrier.send(frame))
+        finally:
+            if receiver_running:
+                self.model.set_receiver_state("listening")
         return {"carrier": carrier.status(), "delivered": [delivered]}
 
     def journal(self) -> dict[str, Any]:
-        with self._lock:
-            entries = [
-                {
-                    "id": item["id"],
-                    "observed_at": item["observed_at"],
-                    "origin": item["origin"],
-                    "title": item["title"],
-                    "summary": item["summary"],
-                    "received_frame_hex": item["received_frame_hex"],
-                    "family": item["family"],
-                    "capture": item.get("capture"),
-                }
-                for item in self._entries
-            ]
-        return {"entries": entries, "count": len(entries), "retention": "process-local, newest 100"}
+        return self.model.journal()
 
     def inspection(self, identifier: str) -> dict[str, Any] | None:
-        with self._lock:
-            return next((dict(item) for item in self._entries if item["id"] == identifier), None)
+        return self.model.inspection(identifier)
+
+    def model_state(self) -> dict[str, Any]:
+        snapshot = self.model.snapshot()
+        snapshot["physical_adapter"] = (
+            self.carrier.status() if isinstance(self.carrier, Nrf905Transport) else None
+        )
+        return snapshot
+
+    def model_changes(self, revision: int) -> dict[str, Any]:
+        return self.model.changes_since(revision)
+
+    def subscribe_to_model(self, callback: Callable[[int], None]) -> Callable[[], None]:
+        return self.model.subscribe(callback)
 
     def _replay_response(self, frames: list[CarrierFrame]) -> dict[str, Any]:
         delivered = [self._consume(item) for item in frames]
@@ -156,9 +184,8 @@ class WorkbenchService:
         }
         return self._store(result, f"recording: {item.recording_id}", capture)
 
-    def _consume_physical(self, item: CarrierFrame) -> dict[str, Any]:
+    def consume_physical(self, item: CarrierFrame) -> dict[str, Any]:
         carrier = self._physical_carrier()
-        result = self.wire.inspect(item.frame.hex(), "fixed")
         capture = {
             "transport": "nrf905",
             "profile_id": carrier.profile.identifier,
@@ -167,6 +194,17 @@ class WorkbenchService:
             "direction": item.direction,
             "note": item.note,
         }
+        try:
+            result = self.wire.inspect(item.frame.hex(), "fixed")
+        except self.wire.codec_error as exc:
+            result = {
+                "title": "Invalid physical frame",
+                "summary": exc.message,
+                "received_frame_hex": item.frame.hex(),
+                "received_bytes": len(item.frame),
+                "family": {"id": "invalid", "label": "Invalid frame"},
+                "inspection_error": exc.as_dict(),
+            }
         return self._store(result, f"nrf905: {carrier.profile.identifier}", capture)
 
     def _physical_carrier(self) -> Nrf905Transport:
@@ -190,6 +228,4 @@ class WorkbenchService:
             "capture": capture,
             **result,
         }
-        with self._lock:
-            self._entries.appendleft(entry)
-        return entry
+        return self.model.publish(entry)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -56,7 +57,7 @@ class LinuxDigitalLines:
             )
         try:
             import gpiod
-            from gpiod.line import Bias, Direction, Value
+            from gpiod.line import Bias, Direction, Edge, Value
         except ImportError as exc:
             raise Nrf905Error(
                 "NRF905_GPIO_DEPENDENCY",
@@ -65,7 +66,10 @@ class LinuxDigitalLines:
         self._value = Value
         self._offsets = profile.gpio.named_lines()
         output_offsets = tuple(self._offsets[name] for name in self._outputs)
-        input_offsets = tuple(self._offsets[name] for name in self._inputs)
+        sampled_input_offsets = tuple(
+            self._offsets[name] for name in ("carrier_detect", "address_match")
+        )
+        data_ready_offset = self._offsets["data_ready"]
         try:
             self._request = gpiod.request_lines(
                 str(chip),
@@ -75,9 +79,14 @@ class LinuxDigitalLines:
                         direction=Direction.OUTPUT,
                         output_value=Value.INACTIVE,
                     ),
-                    input_offsets: gpiod.LineSettings(
+                    sampled_input_offsets: gpiod.LineSettings(
                         direction=Direction.INPUT,
                         bias=Bias.DISABLED,
+                    ),
+                    data_ready_offset: gpiod.LineSettings(
+                        direction=Direction.INPUT,
+                        bias=Bias.DISABLED,
+                        edge_detection=Edge.RISING,
                     ),
                 },
             )
@@ -95,6 +104,19 @@ class LinuxDigitalLines:
         if name not in self._inputs:
             raise Nrf905Error("NRF905_GPIO_DIRECTION", f"{name} is not an input signal.")
         return self._request.get_value(self._offsets[name]) == self._value.ACTIVE
+
+    def wait(self, name: str, timeout_s: float) -> bool:
+        if name != "data_ready":
+            raise Nrf905Error(
+                "NRF905_GPIO_WAIT",
+                "Only the nRF905 data_ready signal supports event waiting.",
+            )
+        if self.get(name):
+            return True
+        ready = self._request.wait_edge_events(timeout=timedelta(seconds=max(0.0, timeout_s)))
+        if ready:
+            self._request.read_edge_events()
+        return self.get(name)
 
     def close(self) -> None:
         self._request.release()

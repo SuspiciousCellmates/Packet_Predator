@@ -13,7 +13,7 @@
     "snapshot_tag": "packet-predator-v0-experimental",
     "manifest": ".foundation/runtime-freeze.sha256",
     "replacement_requires_adr": true,
-    "replacement_adr": "docs/adr/0005-begin-nrf905-physical-validation.md",
+    "replacement_adr": "docs/adr/0006-decouple-physical-receive-from-browser.md",
     "legacy_files_remain_immutable": true
   },
   "next_milestone": "game-controller-and-console"

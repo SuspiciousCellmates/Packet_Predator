@@ -20,12 +20,14 @@ The archived runtime remains frozen as evidence by `.foundation/runtime-freeze.s
 | Replay catalogue | `packet_predator/replay.py`, `recordings/` | Validate finite recording timetables and resolve released example references without game behavior |
 | Transport | `packet_predator/transport.py` | Publish the opaque-frame receive boundary; provide inspect-only and explicitly selected deterministic replay adapters |
 | Physical adapter | `packet_predator/adapters/nrf905.py`, `packet_predator/adapters/nrf905_linux.py`, `packet_predator/nrf905_transport.py` | Configure and move opaque fixed frames through an explicitly selected nRF905; isolate Linux SPI/GPIO imports and know no message semantics |
+| Physical receiver | `packet_predator/receiver.py` | Own the configured adapter's receive lifecycle, wait for frames independently of browsers, and hand opaque frames to the service |
 | Deployment profile | `packet_predator/nrf905_profile.py`, `config/` | Strictly validate local SPI, GPIO, and radio settings without making them shared protocol constants |
-| Workbench service | `packet_predator/service.py` | Turn fixture, pasted, or replay-delivered bytes into inspectable entries and process-local history |
-| Thin web layer | `packet_predator/web.py` | Validate HTTP inputs, call the service, return JSON, and serve static files |
-| Browser UI | `workbench_web/` | Fixture browsing, search, summary, field/label inspection, validation feedback, and byte drill-down |
+| Workbench service | `packet_predator/service.py` | Turn fixture, pasted, replay-delivered, or physically received bytes into inspectable observations |
+| Presentation model | `packet_predator/model.py` | Retain the newest 100 immutable observations, receiver state, monotonic revisions, and subscriber notifications |
+| Thin web layer | `packet_predator/web.py` | Own application lifespan, validate HTTP inputs, expose model snapshots/events, and serve static files |
+| Browser UI | `workbench_web/` | Observe model state; present fixture browsing, search, summaries, fields, validation feedback, and byte drill-down without driving physical receive |
 
-Dependency direction is web → service → replay catalogue / transport / wire adapter. The replay catalogue resolves examples through an injected wire-adapter operation, then gives opaque frames to the transport. The nRF905 transport accepts only complete fixed frames; it does not decode their fields. Linux-specific imports are confined to `packet_predator/adapters/nrf905_linux.py`. The wire adapter alone loads the sibling reference codec. The supported runtime imports none of the archived modules.
+Dependency direction is web → service → model / receiver / replay catalogue / transport / wire adapter. For live capture, the application-lifecycle receiver waits on the physical transport, the service inspects each opaque frame, and the model publishes the resulting observation. The browser reads a snapshot and subscribes to model-revision events; browser timing never calls or backpressures the radio. The replay catalogue resolves examples through an injected wire-adapter operation, then gives opaque frames to the transport. The nRF905 transport accepts only complete fixed frames; it does not decode their fields. Linux-specific imports are confined to `packet_predator/adapters/nrf905_linux.py`. The wire adapter alone loads the sibling reference codec. The supported runtime imports none of the archived modules.
 
 ## Target boundaries
 
@@ -52,6 +54,6 @@ Dependency direction is web → service → replay catalogue / transport / wire 
 
 ## Active physical-validation constraint
 
-ADR 0005 and `.foundation/runtime-baseline.json` authorize one explicitly configured nRF905 adapter while retaining the old hash manifest as an archive-preservation check. Inspect-only remains the default. The adapter may capture a frame or execute one confirmed manual transmit request; it cannot construct responses, emulate a node, branch on message meaning, or implement Game Controller policy. Deterministic replay remains available under the ADR 0004 constraints.
+ADR 0005, ADR 0006, and `.foundation/runtime-baseline.json` authorize one explicitly configured nRF905 adapter while retaining the old hash manifest as an archive-preservation check. Inspect-only remains the default. With a profile, application lifespan starts a signal-driven receiver before any browser is required and stops it before GPIO/SPI close. Receive, transmit, and close are serialized; codec-invalid frames remain visible without stopping capture. The adapter may capture a frame or execute one confirmed manual transmit request; it cannot construct responses, emulate a node, branch on message meaning, or implement Game Controller policy. Deterministic replay remains available under the ADR 0004 constraints.
 
 Packet Predator may impersonate a Game Controller or another participant only in an isolated bench environment. For integration testing it should drive a real Game Controller through an intentional test interface. A future shared console platform does not merge these deployed roles: the production Game Master Console must lack raw-frame injection, endpoint impersonation, and direct-node access in its backend permissions and network reach, not merely hide those controls.
