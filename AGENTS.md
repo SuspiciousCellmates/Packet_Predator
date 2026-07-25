@@ -38,6 +38,31 @@ Before planning or editing, read:
 
 Make contract changes in `../Protocol_Contract`, not here. Every contract change requires an ADR, affected fixture updates, a version change, and a changelog entry. Follow the contract repository's `AGENTS.md` workflow and do not freeze v1 before the component/message inventory review.
 
+## Documentation and NotebookLM
+
+Documentation is a maintained project surface, not a retrospective task. In
+the same change as any material design, behavior, interface, operational, or
+hardware-validation change, update the relevant repository Markdown so a
+fresh reader and the NotebookLM documentation viewer can understand the
+current state without chat history or source-code archaeology.
+
+- Keep `README.md` accurate for the supported purpose, current status, setup,
+  normal use, limitations, and links to deeper documents.
+- Keep the active roadmap, architecture, validation records, and ADRs aligned
+  with the implementation. Add an ADR when a durable boundary or decision is
+  changed; add a dated changelog entry for a user-visible or milestone-level
+  change.
+- Use standalone, human-readable Markdown: a descriptive title, clear heading
+  hierarchy, short narrative explanation before dense detail, defined terms on
+  first use, explicit assumptions/status/date where useful, and links to the
+  authoritative sibling document rather than copied protocol values.
+- Do not leave essential meaning only in JSON, fixtures, command output, a
+  commit message, or an earlier conversation. Add a concise Markdown guide
+  when structured data or a command needs interpretation.
+- Do not churn documentation for a purely internal refactor with no changed
+  behavior, boundary, operation, or decision. Never claim hardware validation
+  or support that has not actually occurred.
+
 ## Completion
 
 Run `./scripts/check` before reporting completion. Preserve the archived-runtime hashes and do not add an architecture exception merely to make a check pass. ADR 0005 and `.foundation/runtime-baseline.json` authorize the nRF905 validation boundary; changing that boundary requires another ADR.
