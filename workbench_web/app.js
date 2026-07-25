@@ -11,7 +11,7 @@ const state = {
 };
 
 const elements = Object.fromEntries([
-  "carrierStatus", "authorityStatus", "exampleCount", "exampleSearch", "exampleList",
+  "fontPreference", "carrierStatus", "authorityStatus", "exampleCount", "exampleSearch", "exampleList",
   "frameInput", "frameMode", "inputByteCount", "inspectButton", "errorPanel",
   "errorCode", "errorMessage", "emptyState", "resultPanel", "starterExample",
   "resultFamily", "resultTitle", "resultSummary", "messageValue", "representation",
@@ -27,6 +27,25 @@ const elements = Object.fromEntries([
   "radioCard", "radioProfile", "radioDevices", "radioFrequency", "radioChannel", "radioAddress",
   "radioCrc", "radioActivity", "radioPins", "transmitConfirm", "transmitButton",
 ].map((id) => [id, document.getElementById(id)]));
+
+function applyTypeface(preference) {
+  const selected = preference === "mono" ? "mono" : "sans";
+  document.documentElement.dataset.font = selected;
+  elements.fontPreference.value = selected;
+  try {
+    window.localStorage.setItem("packet-predator-typeface", selected);
+  } catch (_) {
+    // The preference remains active for this page when browser storage is unavailable.
+  }
+}
+
+function storedTypeface() {
+  try {
+    return window.localStorage.getItem("packet-predator-typeface") || "sans";
+  } catch (_) {
+    return "sans";
+  }
+}
 
 function escaped(value) {
   return String(value)
@@ -66,6 +85,7 @@ function showError(detail) {
   elements.errorCode.textContent = prettyRole(detail.code || "Inspection error");
   elements.errorMessage.textContent = detail.message || "The frame could not be inspected.";
   elements.errorPanel.hidden = false;
+  elements.errorPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 function clearError() {
@@ -131,7 +151,7 @@ function renderResult(item, shouldScroll = true) {
   elements.emptyState.hidden = true;
   elements.resultPanel.hidden = false;
   elements.resultFamily.textContent = item.family.label;
-  elements.resultTitle.textContent = item.title;
+  elements.resultTitle.textContent = item.meaning.name;
   elements.resultSummary.textContent = item.summary;
   elements.messageValue.textContent = `${item.envelope.message_type_hex} · ${item.meaning.name}`;
   elements.representation.textContent = item.representation;
@@ -441,6 +461,7 @@ function bindTabs() {
 }
 
 async function initialise() {
+  applyTypeface(storedTypeface());
   bindTabs();
   try {
     const [status, examples, replays] = await Promise.all([api("/api/status"), api("/api/v1/examples"), api("/api/replays")]);
@@ -463,6 +484,7 @@ async function initialise() {
 }
 
 elements.exampleSearch.addEventListener("input", renderExamples);
+elements.fontPreference.addEventListener("change", () => applyTypeface(elements.fontPreference.value));
 elements.frameInput.addEventListener("input", () => {
   elements.frameInput.dataset.origin = "pasted frame";
   updateByteCount();

@@ -57,6 +57,23 @@ Packet Predator was deliberately started with a radio configuration. It listens 
 
 This means Packet Predator found the shared message rulebook. The number identifies the version it is using. If the page says **Contract unavailable**, the two project folders may not be in the expected places.
 
+### Reading the live-radio screen
+
+When Packet Predator starts with a physical radio, the page keeps the live
+workflow together. The nRF905 status and deliberate transmit controls appear
+first. The currently inspected, transmitted, or received frame appears
+immediately below them, followed by **Recently inspected**. The manual
+hexadecimal editor and deterministic recording player come afterward as
+secondary tools.
+
+The large frame heading uses the exact protocol symbol, such as
+`HELLO_RESULT`, so it can be compared directly with logs, fixtures, and source
+documentation. The surrounding sentence still explains the message in
+ordinary language.
+
+Use the **Typeface** selector in the top bar to choose **Sans** or
+**Monospace**. Packet Predator remembers that choice in the current browser.
+
 ## Your first five-minute tour
 
 Start without a radio. This lets you learn the screen without transmitting anything.

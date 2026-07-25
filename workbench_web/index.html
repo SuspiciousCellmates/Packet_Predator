@@ -18,6 +18,13 @@
         </span>
       </a>
       <div class="status-line" aria-live="polite">
+        <label class="typeface-control">
+          <span>Typeface</span>
+          <select id="fontPreference" aria-label="Workbench typeface">
+            <option value="sans">Sans</option>
+            <option value="mono">Monospace</option>
+          </select>
+        </label>
         <span class="status-pill neutral" id="carrierStatus"><i></i> Checking local mode</span>
         <span class="status-pill" id="authorityStatus">Contract —</span>
       </div>
@@ -79,93 +86,9 @@
           </div>
         </section>
 
-        <section class="replay-card" aria-labelledby="replayHeading">
-          <div class="replay-topline">
-            <div>
-              <p class="eyebrow accent">Deterministic recording player</p>
-              <h3 id="replayHeading">Reproduce a packet exchange</h3>
-            </div>
-            <span class="no-actors"><i></i> Frames only · no actors</span>
-          </div>
-          <div class="replay-picker-row">
-            <label class="recording-picker">Recording
-              <select id="recordingSelect">
-                <option value="">Choose a recording…</option>
-              </select>
-            </label>
-            <p id="recordingDescription">Nothing runs until you deliberately choose a finite recording.</p>
-          </div>
-          <div class="replay-body" id="replayBody" hidden>
-            <div class="replay-dashboard">
-              <div class="transport-readout">
-                <small>Fake transport</small>
-                <strong id="replayStateLabel">Ready</strong>
-                <span id="replayPosition">0.00 / 0.00 seconds</span>
-              </div>
-              <div class="replay-controls" aria-label="Recording playback controls">
-                <button id="replayReset" class="icon-button" type="button" title="Reset recording" aria-label="Reset recording">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M5.5 15a7 7 0 1 0 .7-7.8L4 10"/></svg>
-                </button>
-                <button id="replayStep" class="secondary-button" type="button">
-                  Step
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 5 9 7-9 7V5Zm10 0v14"/></svg>
-                </button>
-                <button id="replayPlay" class="primary-button compact" type="button">
-                  Play
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg>
-                </button>
-                <button id="replayPause" class="secondary-button" type="button" hidden>
-                  Pause
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
-                </button>
-                <label class="speed-picker">Speed
-                  <select id="replaySpeed">
-                    <option value="0.5">0.5×</option>
-                    <option value="1" selected>1×</option>
-                    <option value="2">2×</option>
-                    <option value="4">4×</option>
-                  </select>
-                </label>
-              </div>
-            </div>
-            <div class="progress-track" aria-hidden="true"><i id="replayProgress"></i></div>
-            <div class="replay-schedule-heading">
-              <span>Recorded timetable</span>
-              <small id="replayFrameCount">0 frames</small>
-            </div>
-            <ol class="replay-schedule" id="replaySchedule"></ol>
-          </div>
-        </section>
-
-        <section class="input-card" aria-labelledby="inputHeading">
-          <div class="card-heading">
-            <div>
-              <p class="eyebrow">Frame input</p>
-              <h3 id="inputHeading">Paste bytes or use an example</h3>
-            </div>
-            <span class="byte-count" id="inputByteCount">0 bytes</span>
-          </div>
-          <label class="hex-field">
-            <span class="sr-only">Hexadecimal frame</span>
-            <textarea id="frameInput" rows="3" spellcheck="false" placeholder="For example: 46 07 00 01 01 00 E8 03 00 00"></textarea>
-          </label>
-          <div class="input-actions">
-            <label class="mode-field">Interpret as
-              <select id="frameMode">
-                <option value="auto">Detect logical or 32-byte frame</option>
-                <option value="logical">Logical frame</option>
-                <option value="fixed">Fixed 32-byte adapter frame</option>
-              </select>
-            </label>
-            <button class="primary-button" id="inspectButton" type="button">
-              Inspect frame
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14 0m-6-6 6 6-6 6"/></svg>
-            </button>
-          </div>
-          <div class="error-panel" id="errorPanel" role="alert" hidden>
-            <span>!</span><div><strong id="errorCode">Could not inspect frame</strong><p id="errorMessage"></p></div>
-          </div>
-        </section>
+        <div class="error-panel" id="errorPanel" role="alert" hidden>
+          <span>!</span><div><strong id="errorCode">Workbench action failed</strong><p id="errorMessage"></p></div>
+        </div>
 
         <section class="empty-state" id="emptyState">
           <div class="radar" aria-hidden="true"><span></span></div>
@@ -256,6 +179,91 @@
         <section class="journal-card" id="journalCard" hidden>
           <div class="card-heading"><div><p class="eyebrow">This session</p><h3>Recently inspected</h3></div><small>Clears when the server stops</small></div>
           <div class="journal-list" id="journalList"></div>
+        </section>
+
+        <section class="input-card" aria-labelledby="inputHeading">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">Frame input</p>
+              <h3 id="inputHeading">Paste bytes or use an example</h3>
+            </div>
+            <span class="byte-count" id="inputByteCount">0 bytes</span>
+          </div>
+          <label class="hex-field">
+            <span class="sr-only">Hexadecimal frame</span>
+            <textarea id="frameInput" rows="3" spellcheck="false" placeholder="For example: 46 07 00 01 01 00 E8 03 00 00"></textarea>
+          </label>
+          <div class="input-actions">
+            <label class="mode-field">Interpret as
+              <select id="frameMode">
+                <option value="auto">Detect logical or 32-byte frame</option>
+                <option value="logical">Logical frame</option>
+                <option value="fixed">Fixed 32-byte adapter frame</option>
+              </select>
+            </label>
+            <button class="primary-button" id="inspectButton" type="button">
+              Inspect frame
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14 0m-6-6 6 6-6 6"/></svg>
+            </button>
+          </div>
+        </section>
+
+        <section class="replay-card" aria-labelledby="replayHeading">
+          <div class="replay-topline">
+            <div>
+              <p class="eyebrow accent">Deterministic recording player</p>
+              <h3 id="replayHeading">Reproduce a packet exchange</h3>
+            </div>
+            <span class="no-actors"><i></i> Frames only · no actors</span>
+          </div>
+          <div class="replay-picker-row">
+            <label class="recording-picker">Recording
+              <select id="recordingSelect">
+                <option value="">Choose a recording…</option>
+              </select>
+            </label>
+            <p id="recordingDescription">Nothing runs until you deliberately choose a finite recording.</p>
+          </div>
+          <div class="replay-body" id="replayBody" hidden>
+            <div class="replay-dashboard">
+              <div class="transport-readout">
+                <small>Fake transport</small>
+                <strong id="replayStateLabel">Ready</strong>
+                <span id="replayPosition">0.00 / 0.00 seconds</span>
+              </div>
+              <div class="replay-controls" aria-label="Recording playback controls">
+                <button id="replayReset" class="icon-button" type="button" title="Reset recording" aria-label="Reset recording">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M5.5 15a7 7 0 1 0 .7-7.8L4 10"/></svg>
+                </button>
+                <button id="replayStep" class="secondary-button" type="button">
+                  Step
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 5 9 7-9 7V5Zm10 0v14"/></svg>
+                </button>
+                <button id="replayPlay" class="primary-button compact" type="button">
+                  Play
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg>
+                </button>
+                <button id="replayPause" class="secondary-button" type="button" hidden>
+                  Pause
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+                </button>
+                <label class="speed-picker">Speed
+                  <select id="replaySpeed">
+                    <option value="0.5">0.5×</option>
+                    <option value="1" selected>1×</option>
+                    <option value="2">2×</option>
+                    <option value="4">4×</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="progress-track" aria-hidden="true"><i id="replayProgress"></i></div>
+            <div class="replay-schedule-heading">
+              <span>Recorded timetable</span>
+              <small id="replayFrameCount">0 frames</small>
+            </div>
+            <ol class="replay-schedule" id="replaySchedule"></ol>
+          </div>
         </section>
       </section>
     </main>

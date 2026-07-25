@@ -64,6 +64,13 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn(b"text/html", headers[b"content-type"])
         self.assertIn(b"Hardware-free inspection", body)
+        self.assertIn(b'id="fontPreference"', body)
+        self.assertLess(body.index(b'id="radioCard"'), body.index(b'id="resultPanel"'))
+        self.assertLess(body.index(b'id="resultPanel"'), body.index(b'id="inputHeading"'))
+        self.assertLess(body.index(b'id="inputHeading"'), body.index(b'id="replayHeading"'))
+
+        app_source = (REPO_ROOT / "workbench_web/app.js").read_text(encoding="utf-8")
+        self.assertIn("elements.resultTitle.textContent = item.meaning.name;", app_source)
 
     def test_status_is_explicitly_inspect_only(self):
         status, _, body = asyncio.run(asgi_request("GET", "/api/status"))
