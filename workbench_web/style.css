@@ -912,20 +912,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 
 .radio-actions {
-  margin-top: 14px;
+  margin-top: 12px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-end;
+  gap: 12px;
   flex-wrap: wrap;
-}
-
-.radio-actions > p {
-  flex: 1 1 300px;
-  margin: 0;
-  color: var(--muted);
-  font-size: var(--text-xs);
-  line-height: 1.45;
 }
 
 .radio-transmit {
