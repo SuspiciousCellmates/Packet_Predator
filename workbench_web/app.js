@@ -157,11 +157,6 @@ function chooseExample(id) {
   elements.frameInput.dataset.origin = `contract example: ${item.id}`;
   renderExamples();
   updateByteCount();
-
-  // Switch tab focus to Custom Hex Input
-  const hexTab = document.querySelector('.input-tab[data-input-tab="hex"]');
-  if (hexTab) hexTab.click();
-
   inspectFrame();
 }
 
@@ -433,19 +428,8 @@ function renderPhysicalStatus(carrier) {
   state.physical = carrier;
   const profile = carrier.profile;
   elements.radioCard.hidden = false;
-  elements.modeEyebrow.textContent = "Physical adapter validation";
-  elements.modeHeading.textContent = "See the exact bytes that cross your radio bench.";
-  elements.modeDescription.textContent = "Packet Predator still validates every frame through the shared contract, while the configured nRF905 moves only complete 32-byte frames.";
-  elements.truthTitle.textContent = "Live nRF905";
-  elements.truthDetail.textContent = carrier.can_transmit ? "Receive and confirmed transmit are enabled." : "Listening only; transmit is disabled in the profile.";
   elements.radioProfile.textContent = profile.id;
-  elements.radioDevices.textContent = `${profile.spi_device} · ${profile.gpio_chip}`;
   elements.radioFrequency.textContent = `${profile.frequency_mhz.toFixed(1)} MHz`;
-  elements.radioChannel.textContent = `band ${profile.band} · channel ${profile.channel} · ${profile.transmit_power_dbm} dBm`;
-  elements.radioAddress.textContent = profile.physical_address_hex;
-  elements.radioCrc.textContent = `${profile.crc_bits}-bit hardware CRC`;
-  const pins = carrier.pins || {};
-  elements.radioPins.textContent = `CD ${Number(Boolean(pins.carrier_detect))} · AM ${Number(Boolean(pins.address_match))} · DR ${Number(Boolean(pins.data_ready))}`;
   elements.transmitButton.disabled = !carrier.can_transmit;
   elements.transmitConfirm.disabled = !carrier.can_transmit;
   elements.carrierStatus.innerHTML = `<i></i> ${escaped(carrier.label)} · listening`;

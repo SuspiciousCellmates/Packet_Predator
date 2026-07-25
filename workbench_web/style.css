@@ -530,6 +530,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 .input-card {
   flex: 1 1 auto;
+  min-height: 0;
+  max-height: calc(100% - 180px);
+}
+
+.journal-card {
+  flex: 0 0 auto;
+  min-height: 160px;
+  max-height: 220px;
 }
 
 .result {
@@ -538,6 +546,56 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 .replay-card {
   flex: 1 1 auto;
+}
+
+.radio-card {
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  background: linear-gradient(160deg, rgba(17, 30, 33, 0.95), rgba(11, 20, 22, 0.95));
+  border: 1px solid var(--line-accent);
+  border-radius: var(--radius-md);
+  margin-bottom: 4px;
+}
+
+.radio-bar-inline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.radio-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-xs);
+}
+
+.radio-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--cyan-soft);
+  color: var(--cyan);
+  font-weight: 700;
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.radio-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.transmit-confirm {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
 }
 
 /* Tabbed Input Widget */

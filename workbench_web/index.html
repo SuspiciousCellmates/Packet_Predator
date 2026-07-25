@@ -168,12 +168,12 @@
           </div>
 
           <div class="tab-bar" role="tablist" aria-label="Inspection detail">
-            <button class="tab active" role="tab" aria-selected="true" data-tab="overview">Overview</button>
-            <button class="tab" role="tab" aria-selected="false" data-tab="fields">Fields <span id="fieldCount">0</span></button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="overview">Overview</button>
+            <button class="tab active" role="tab" aria-selected="true" data-tab="fields">Fields <span id="fieldCount">0</span></button>
             <button class="tab" role="tab" aria-selected="false" data-tab="bytes">Bytes <span id="resultByteCount">0</span></button>
           </div>
 
-          <div class="tab-panel active" id="tab-overview" role="tabpanel">
+          <div class="tab-panel" id="tab-overview" role="tabpanel" hidden>
             <div class="detail-grid">
               <article class="detail-card">
                 <p class="eyebrow">Delivery expectation</p>
@@ -192,7 +192,7 @@
             </div>
           </div>
 
-          <div class="tab-panel" id="tab-fields" role="tabpanel" hidden>
+          <div class="tab-panel active" id="tab-fields" role="tabpanel">
             <div class="field-note"><span>i</span> Labels are for readability; numeric values and byte offsets remain visible for verification.</div>
             <div class="envelope-grid" aria-label="Envelope fields">
               <div><small>Wire generation</small><strong id="wireGeneration">—</strong><span>upper 2 bits · byte 0</span></div>
@@ -220,14 +220,26 @@
         </section>
       </div>
 
-      <!-- Column 3: Replay Simulation Player (Right) -->
+      <!-- Column 3: Replay Simulation Player & Physical Transmit (Right) -->
       <div class="dash-col col-tools">
-        <!-- Hidden DOM element references preserved for JS/tests -->
-        <section class="radio-card" id="radioCard" aria-labelledby="radioHeading" hidden style="display: none !important;">
-          <h3 id="radioHeading" class="sr-only">Physical validation bench</h3>
-          <input id="transmitConfirm" type="checkbox" class="sr-only">
-          <button id="transmitButton" type="button" class="sr-only">Transmit</button>
-          <span id="radioProfile"></span><span id="radioDevices"></span><span id="radioFrequency"></span><span id="radioChannel"></span><span id="radioAddress"></span><span id="radioCrc"></span><span id="radioActivity"></span><span id="radioPins"></span>
+        <!-- Compact Physical Radio Transmit Bar (active when physical radio is connected) -->
+        <section class="radio-card" id="radioCard" aria-labelledby="radioHeading" hidden>
+          <div class="radio-bar-inline">
+            <div class="radio-meta">
+              <span class="radio-badge accent">nRF905 Radio</span>
+              <strong id="radioProfile">—</strong>
+              <small id="radioFrequency">—</small>
+            </div>
+            <div class="radio-controls">
+              <label class="transmit-confirm"><input id="transmitConfirm" type="checkbox"> Confirm 1 RF transmission</label>
+              <button class="primary-button compact" id="transmitButton" type="button">Transmit frame</button>
+            </div>
+          </div>
+          <!-- Hidden DOM element references preserved for JS/tests -->
+          <div class="sr-only">
+            <h3 id="radioHeading">Physical validation bench</h3>
+            <span id="radioDevices"></span><span id="radioChannel"></span><span id="radioAddress"></span><span id="radioCrc"></span><span id="radioActivity"></span><span id="radioPins"></span>
+          </div>
         </section>
 
         <section class="replay-card" aria-labelledby="replayHeading">
