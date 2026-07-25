@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Packet Predator local frame inspection workbench">
   <title>Packet Predator · Local Workbench</title>
-  <link rel="stylesheet" href="/assets/style.css?v=20260725-2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">  <link rel="stylesheet" href="/assets/style.css?v=20260725-2">
 </head>
 <body>
   <div class="shell">
@@ -18,23 +20,27 @@
         </span>
       </a>
       <div class="status-line" aria-live="polite">
-        <label class="typeface-control">
-          <span>Text size</span>
-          <select id="textSizePreference" aria-label="Workbench text size">
-            <option value="comfortable">Comfortable</option>
-            <option value="large">Large</option>
-            <option value="extra-large">Extra large</option>
-          </select>
-        </label>
-        <label class="typeface-control">
-          <span>Typeface</span>
-          <select id="fontPreference" aria-label="Workbench typeface">
-            <option value="sans">Sans</option>
-            <option value="mono">Monospace</option>
-          </select>
-        </label>
-        <span class="status-pill neutral" id="carrierStatus"><i></i> Checking local mode</span>
-        <span class="status-pill" id="authorityStatus">Contract —</span>
+        <div class="controls-group">
+          <label class="typeface-control">
+            <span>Size</span>
+            <select id="textSizePreference" aria-label="Workbench text size">
+              <option value="comfortable">Comfortable</option>
+              <option value="large">Large</option>
+              <option value="extra-large">Extra large</option>
+            </select>
+          </label>
+          <label class="typeface-control">
+            <span>Font</span>
+            <select id="fontPreference" aria-label="Workbench typeface">
+              <option value="sans">Sans</option>
+              <option value="mono">Monospace</option>
+            </select>
+          </label>
+        </div>
+        <div class="pills-group">
+          <span class="status-pill neutral" id="carrierStatus"><i></i> Checking local mode</span>
+          <span class="status-pill" id="authorityStatus">Contract —</span>
+        </div>
       </div>
     </header>
 
@@ -46,13 +52,14 @@
             <h1>Example frames</h1>
             <span id="exampleCount">—</span>
           </div>
-          <p>Known-good frames from the shared contract. Choose one to see how it travels and what it means.</p>
         </div>
-        <label class="search-box">
-          <span class="sr-only">Search examples</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
-          <input id="exampleSearch" type="search" placeholder="Search name or family" autocomplete="off">
-        </label>
+        <div class="search-wrap">
+          <label class="search-box">
+            <span class="sr-only">Search examples</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
+            <input id="exampleSearch" type="search" placeholder="Search frame name or family…" autocomplete="off">
+          </label>
+        </div>
         <nav id="exampleList" class="example-list" aria-label="Available example frames">
           <div class="loading-block">Loading examples…</div>
         </nav>
@@ -60,40 +67,131 @@
 
       <section class="inspector">
         <div class="intro">
-          <div>
-            <p class="eyebrow accent" id="modeEyebrow">Hardware-free inspection</p>
-            <h2 id="modeHeading">Understand a frame before touching a radio.</h2>
-            <p id="modeDescription">Pick a real example or paste hexadecimal bytes. Packet Predator checks them with the shared reference codec, then explains the route, meaning, and exact layout.</p>
+          <div class="intro-headline">
+            <span class="status-indicator"></span>
+            <strong id="modeHeading" class="dashboard-title">Inspection Bench</strong>
+            <span class="eyebrow accent" id="modeEyebrow">Hardware-free inspection</span>
+            <p id="modeDescription" hidden></p>
           </div>
           <div class="truth-card" id="truthCard">
             <span class="truth-icon" aria-hidden="true">⌁</span>
-            <div><strong id="truthTitle">No live carrier</strong><small id="truthDetail">Nothing here sends to a node.</small></div>
+            <div><strong id="truthTitle">No live carrier</strong><small id="truthDetail">Inspect mode · safe execution</small></div>
           </div>
         </div>
 
-        <section class="radio-card" id="radioCard" aria-labelledby="radioHeading" hidden>
-          <div class="replay-topline">
+        <!-- Section 1: Frame Input Card (Primary Action) -->
+        <section class="input-card" aria-labelledby="inputHeading">
+          <div class="card-heading">
             <div>
-              <p class="eyebrow accent">Physical validation bench</p>
-              <h3 id="radioHeading">nRF905 capture and deliberate transmit</h3>
+              <p class="eyebrow">Frame input</p>
+              <h3 id="inputHeading">Paste bytes or select an example</h3>
             </div>
-            <span class="radio-listening"><i></i> Listening · no automatic replies</span>
+            <span class="byte-count" id="inputByteCount">0 bytes</span>
           </div>
-          <div class="radio-grid">
-            <div><small>Profile</small><strong id="radioProfile">—</strong><span id="radioDevices">—</span></div>
-            <div><small>RF setting</small><strong id="radioFrequency">—</strong><span id="radioChannel">—</span></div>
-            <div><small>Physical address</small><strong id="radioAddress">—</strong><span id="radioCrc">—</span></div>
-            <div><small>Last check</small><strong id="radioActivity">Listening</strong><span id="radioPins">CD 0 · AM 0 · DR 0</span></div>
-          </div>
-          <div class="radio-actions">
-            <p>Received frames appear below automatically. To send, choose or paste a frame first; Packet Predator validates it and pads it to exactly 32 bytes.</p>
-            <div class="radio-transmit">
-              <label class="transmit-confirm"><input id="transmitConfirm" type="checkbox"> Confirm one RF transmission</label>
-              <button class="primary-button compact" id="transmitButton" type="button">Transmit current frame</button>
-            </div>
+          <label class="hex-field">
+            <span class="sr-only">Hexadecimal frame</span>
+            <textarea id="frameInput" rows="3" spellcheck="false" placeholder="For example: 46 07 00 01 01 00 E8 03 00 00"></textarea>
+          </label>
+          <div class="input-actions">
+            <label class="mode-field">Interpret as
+              <select id="frameMode">
+                <option value="auto">Detect logical or 32-byte frame</option>
+                <option value="logical">Logical frame</option>
+                <option value="fixed">Fixed 32-byte adapter frame</option>
+              </select>
+            </label>
+            <button class="primary-button" id="inspectButton" type="button">
+              Inspect frame
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14 0m-6-6 6 6-6 6"/></svg>
+            </button>
           </div>
         </section>
 
+        <!-- Section 2: Hardware & Simulation Tools (Physical Radio & Replay Player) -->
+        <div class="workbench-tools">
+          <section class="radio-card" id="radioCard" aria-labelledby="radioHeading" hidden>
+            <div class="replay-topline">
+              <div>
+                <p class="eyebrow accent">Physical validation bench</p>
+                <h3 id="radioHeading">nRF905 capture and deliberate transmit</h3>
+              </div>
+              <span class="radio-listening"><i></i> Listening · no automatic replies</span>
+            </div>
+            <div class="radio-grid">
+              <div><small>Profile</small><strong id="radioProfile">—</strong><span id="radioDevices">—</span></div>
+              <div><small>RF setting</small><strong id="radioFrequency">—</strong><span id="radioChannel">—</span></div>
+              <div><small>Physical address</small><strong id="radioAddress">—</strong><span id="radioCrc">—</span></div>
+              <div><small>Last check</small><strong id="radioActivity">Listening</strong><span id="radioPins">CD 0 · AM 0 · DR 0</span></div>
+            </div>
+            <div class="radio-actions">
+              <p>Received frames appear below automatically. To send, choose or paste a frame first; Packet Predator validates it and pads it to exactly 32 bytes.</p>
+              <div class="radio-transmit">
+                <label class="transmit-confirm"><input id="transmitConfirm" type="checkbox"> Confirm one RF transmission</label>
+                <button class="primary-button compact" id="transmitButton" type="button">Transmit current frame</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="replay-card" aria-labelledby="replayHeading">
+            <div class="replay-topline">
+              <div>
+                <p class="eyebrow accent">Deterministic recording player</p>
+                <h3 id="replayHeading">Reproduce a packet exchange</h3>
+              </div>
+              <span class="no-actors"><i></i> Frames only · no actors</span>
+            </div>
+            <div class="replay-picker-row">
+              <label class="recording-picker">Recording
+                <select id="recordingSelect">
+                  <option value="">Choose a recording…</option>
+                </select>
+              </label>
+              <p id="recordingDescription">Nothing runs until you deliberately choose a finite recording.</p>
+            </div>
+            <div class="replay-body" id="replayBody" hidden>
+              <div class="replay-dashboard">
+                <div class="transport-readout">
+                  <small>Fake transport</small>
+                  <strong id="replayStateLabel">Ready</strong>
+                  <span id="replayPosition">0.00 / 0.00 seconds</span>
+                </div>
+                <div class="replay-controls" aria-label="Recording playback controls">
+                  <button id="replayReset" class="icon-button" type="button" title="Reset recording" aria-label="Reset recording">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M5.5 15a7 7 0 1 0 .7-7.8L4 10"/></svg>
+                  </button>
+                  <button id="replayStep" class="secondary-button" type="button">
+                    Step
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 5 9 7-9 7V5Zm10 0v14"/></svg>
+                  </button>
+                  <button id="replayPlay" class="primary-button compact" type="button">
+                    Play
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg>
+                  </button>
+                  <button id="replayPause" class="secondary-button" type="button" hidden>
+                    Pause
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+                  </button>
+                  <label class="speed-picker">Speed
+                    <select id="replaySpeed">
+                      <option value="0.5">0.5×</option>
+                      <option value="1" selected>1×</option>
+                      <option value="2">2×</option>
+                      <option value="4">4×</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <div class="progress-track" aria-hidden="true"><i id="replayProgress"></i></div>
+              <div class="replay-schedule-heading">
+                <span>Recorded timetable</span>
+                <small id="replayFrameCount">0 frames</small>
+              </div>
+              <ol class="replay-schedule" id="replaySchedule"></ol>
+            </div>
+          </section>
+        </div>
+
+        <!-- Section 3: Error & Inspection Output -->
         <div class="error-panel" id="errorPanel" role="alert" hidden>
           <span>!</span><div><strong id="errorCode">Workbench action failed</strong><p id="errorMessage"></p></div>
         </div>
@@ -184,98 +282,20 @@
           </div>
         </section>
 
+        <!-- Section 4: Recent Packets / Session History -->
         <section class="journal-card" id="journalCard" hidden>
-          <div class="card-heading"><div><p class="eyebrow">This session</p><h3>Recently inspected</h3></div><small>Clears when the server stops</small></div>
-          <div class="journal-list" id="journalList"></div>
-        </section>
-
-        <section class="input-card" aria-labelledby="inputHeading">
           <div class="card-heading">
             <div>
-              <p class="eyebrow">Frame input</p>
-              <h3 id="inputHeading">Paste bytes or use an example</h3>
+              <p class="eyebrow">Recent Packets</p>
+              <h3>Inspected in this session</h3>
             </div>
-            <span class="byte-count" id="inputByteCount">0 bytes</span>
+            <small>Clears when the server stops</small>
           </div>
-          <label class="hex-field">
-            <span class="sr-only">Hexadecimal frame</span>
-            <textarea id="frameInput" rows="3" spellcheck="false" placeholder="For example: 46 07 00 01 01 00 E8 03 00 00"></textarea>
-          </label>
-          <div class="input-actions">
-            <label class="mode-field">Interpret as
-              <select id="frameMode">
-                <option value="auto">Detect logical or 32-byte frame</option>
-                <option value="logical">Logical frame</option>
-                <option value="fixed">Fixed 32-byte adapter frame</option>
-              </select>
-            </label>
-            <button class="primary-button" id="inspectButton" type="button">
-              Inspect frame
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14 0m-6-6 6 6-6 6"/></svg>
-            </button>
-          </div>
-        </section>
-
-        <section class="replay-card" aria-labelledby="replayHeading">
-          <div class="replay-topline">
-            <div>
-              <p class="eyebrow accent">Deterministic recording player</p>
-              <h3 id="replayHeading">Reproduce a packet exchange</h3>
-            </div>
-            <span class="no-actors"><i></i> Frames only · no actors</span>
-          </div>
-          <div class="replay-picker-row">
-            <label class="recording-picker">Recording
-              <select id="recordingSelect">
-                <option value="">Choose a recording…</option>
-              </select>
-            </label>
-            <p id="recordingDescription">Nothing runs until you deliberately choose a finite recording.</p>
-          </div>
-          <div class="replay-body" id="replayBody" hidden>
-            <div class="replay-dashboard">
-              <div class="transport-readout">
-                <small>Fake transport</small>
-                <strong id="replayStateLabel">Ready</strong>
-                <span id="replayPosition">0.00 / 0.00 seconds</span>
-              </div>
-              <div class="replay-controls" aria-label="Recording playback controls">
-                <button id="replayReset" class="icon-button" type="button" title="Reset recording" aria-label="Reset recording">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M5.5 15a7 7 0 1 0 .7-7.8L4 10"/></svg>
-                </button>
-                <button id="replayStep" class="secondary-button" type="button">
-                  Step
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 5 9 7-9 7V5Zm10 0v14"/></svg>
-                </button>
-                <button id="replayPlay" class="primary-button compact" type="button">
-                  Play
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg>
-                </button>
-                <button id="replayPause" class="secondary-button" type="button" hidden>
-                  Pause
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
-                </button>
-                <label class="speed-picker">Speed
-                  <select id="replaySpeed">
-                    <option value="0.5">0.5×</option>
-                    <option value="1" selected>1×</option>
-                    <option value="2">2×</option>
-                    <option value="4">4×</option>
-                  </select>
-                </label>
-              </div>
-            </div>
-            <div class="progress-track" aria-hidden="true"><i id="replayProgress"></i></div>
-            <div class="replay-schedule-heading">
-              <span>Recorded timetable</span>
-              <small id="replayFrameCount">0 frames</small>
-            </div>
-            <ol class="replay-schedule" id="replaySchedule"></ol>
-          </div>
+          <div class="journal-list" id="journalList"></div>
         </section>
       </section>
+
     </main>
-  </div>
   <script src="/assets/app.js?v=20260725-2" defer></script>
 </body>
 </html>

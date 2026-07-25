@@ -68,9 +68,9 @@ class WebApiTests(unittest.TestCase):
         self.assertIn(b'id="fontPreference"', body)
         self.assertIn(b"/assets/style.css?v=20260725-2", body)
         self.assertIn(b"/assets/app.js?v=20260725-2", body)
-        self.assertLess(body.index(b'id="radioCard"'), body.index(b'id="resultPanel"'))
-        self.assertLess(body.index(b'id="resultPanel"'), body.index(b'id="inputHeading"'))
-        self.assertLess(body.index(b'id="inputHeading"'), body.index(b'id="replayHeading"'))
+        self.assertLess(body.index(b'id="inputHeading"'), body.index(b'id="radioCard"'))
+        self.assertLess(body.index(b'id="radioCard"'), body.index(b'id="replayHeading"'))
+        self.assertLess(body.index(b'id="replayHeading"'), body.index(b'id="resultPanel"'))
 
         app_source = (REPO_ROOT / "workbench_web/app.js").read_text(encoding="utf-8")
         self.assertIn("elements.resultTitle.textContent = item.meaning.name;", app_source)

@@ -80,6 +80,15 @@ function prettyRole(value) {
   return String(value).replaceAll("_", " ").toLowerCase().replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
 }
 
+function toEnumFormat(value) {
+  if (!value) return "";
+  return String(value)
+    .trim()
+    .replace(/^v1-/i, "")
+    .replace(/[\s-]+/g, "_")
+    .toUpperCase();
+}
+
 function compactHex(value) {
   return value.trim().replace(/^0x/i, "").replace(/[\s:_-]+/g, "");
 }
@@ -131,7 +140,7 @@ function renderExamples() {
     ${items.map((item) => `
       <button class="example-button ${item.id === state.selectedId ? "active" : ""}" type="button" data-example="${escaped(item.id)}">
         <span class="example-code">0x${String(item.frame_hex.slice(2, 4)).toUpperCase()}</span>
-        <span class="example-copy"><strong>${escaped(item.display_name)}</strong><small>${escaped(item.source_label)} → ${escaped(item.destination_label)}</small></span>
+        <span class="example-copy"><strong>${escaped(toEnumFormat(item.display_name))}</strong><small>${escaped(item.source_label)} → ${escaped(item.destination_label)}</small></span>
       </button>`).join("")}
   `).join("");
   elements.exampleList.querySelectorAll("[data-example]").forEach((button) => {
@@ -248,12 +257,41 @@ async function renderJournal() {
   try {
     const result = await api("/api/inspections");
     elements.journalCard.hidden = result.count === 0;
-    elements.journalList.innerHTML = result.entries.slice(0, 7).map((entry) => `
-      <button class="journal-entry" type="button" data-inspection="${escaped(entry.id)}">
-        <div><strong>${escaped(entry.title)}</strong><small>${entry.capture ? `${entry.capture.transport === "nrf905" ? `${entry.capture.observed_at_ms} ms · RF` : `T+${entry.capture.scheduled_at_ms} ms`} · ${escaped(entry.capture.direction)} · ` : `${escaped(entry.origin)} · `}${escaped(entry.summary)}</small></div>
-        <time datetime="${escaped(entry.observed_at)}">${new Date(entry.observed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
-      </button>
-    `).join("");
+    elements.journalList.innerHTML = result.entries.slice(0, 10).map((entry) => {
+      let badgeHtml = '';
+      if (entry.capture && entry.capture.direction) {
+        if (entry.capture.direction === "received") {
+          badgeHtml = `<span class="journal-badge incoming" title="Incoming frame received"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M19 12l-7 7-7-7"/></svg> INCOMING</span>`;
+        } else if (entry.capture.direction === "transmitted") {
+          badgeHtml = `<span class="journal-badge outgoing" title="Outgoing frame transmitted"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg> OUTGOING</span>`;
+        } else {
+          badgeHtml = `<span class="journal-badge neutral">${escaped(entry.capture.direction)}</span>`;
+        }
+      } else if (entry.origin && entry.origin.includes("example")) {
+        badgeHtml = `<span class="journal-badge example" title="Conformance library example"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> EXAMPLE</span>`;
+      } else {
+        badgeHtml = `<span class="journal-badge pasted" title="Pasted hexadecimal frame"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/></svg> PASTED</span>`;
+      }
+
+      const transportDetail = entry.capture
+        ? (entry.capture.transport === "nrf905"
+            ? `${entry.capture.observed_at_ms} ms · RF`
+            : `T+${entry.capture.scheduled_at_ms} ms`)
+        : escaped(entry.origin);
+
+      return `
+        <button class="journal-entry" type="button" data-inspection="${escaped(entry.id)}">
+          <div class="journal-entry-body">
+            <div class="journal-entry-top">
+              ${badgeHtml}
+              <strong class="journal-entry-title">${escaped(entry.title)}</strong>
+            </div>
+            <small class="journal-entry-meta">${transportDetail} · ${escaped(entry.summary)}</small>
+          </div>
+          <time datetime="${escaped(entry.observed_at)}">${new Date(entry.observed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
+        </button>
+      `;
+    }).join("");
     elements.journalList.querySelectorAll("[data-inspection]").forEach((button) => {
       button.addEventListener("click", () => openInspection(button.dataset.inspection));
     });
@@ -313,7 +351,7 @@ function renderReplayState(result) {
       <li class="schedule-item ${escaped(item.direction)} ${statusClass}" data-sequence="${item.sequence}">
         <time>T+${item.at_ms} ms</time>
         <span class="schedule-direction" title="${directionLabel}">${arrow}</span>
-        <span class="schedule-kind"><strong>${escaped(item.display_name)}</strong><small>${escaped(item.source_label)} → ${escaped(item.destination_label)}</small></span>
+        <span class="schedule-kind"><strong>${escaped(toEnumFormat(item.display_name))}</strong><small>${escaped(item.source_label)} → ${escaped(item.destination_label)}</small></span>
         <span class="schedule-note"><strong>${escaped(item.note)}</strong><small>${escaped(directionLabel)} · ${escaped(item.fixture_id)}</small></span>
       </li>`;
   }).join("");
