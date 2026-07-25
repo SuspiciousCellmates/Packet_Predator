@@ -65,6 +65,8 @@ html {
   background-color: var(--ground);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv05" 1, "cv08" 1, "calt" 1, "tnum" 1;
 }
 
 body {
@@ -242,12 +244,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   gap: 6px;
 }
 
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.6; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.15); box-shadow: 0 0 10px var(--amber); }
+}
+
 .status-pill.neutral i {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: var(--amber);
   box-shadow: 0 0 8px var(--amber);
+  animation: pulse-dot 2s ease-in-out infinite;
 }
 
 .status-pill.ready {
@@ -444,11 +452,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   text-overflow: ellipsis;
 }
 
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
 .loading-block {
   color: var(--muted);
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
-  padding: 20px;
+  padding: 24px 16px;
   text-align: center;
+  animation: pulse-subtle 2s ease-in-out infinite;
 }
 
 /* Inspector Header */
@@ -766,6 +781,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   filter: brightness(1.08);
   transform: translateY(-1px);
   box-shadow: 0 6px 20px var(--acid-glow);
+}
+
+.primary-button:active:not(:disabled) {
+  transform: translateY(1px) scale(0.98);
+  filter: brightness(0.95);
 }
 
 .primary-button:disabled {
@@ -1615,12 +1635,15 @@ td strong {
 
 td small {
   display: inline-block;
+  width: 52px;
+  text-align: center;
+  box-sizing: border-box;
   color: var(--cyan);
   background: var(--cyan-soft);
   border: 1px solid var(--line-accent);
   border-radius: var(--radius-sm);
-  padding: 1px 5px;
-  margin-right: 6px;
+  padding: 1px 4px;
+  margin-right: 8px;
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 500;
@@ -1630,6 +1653,7 @@ td small {
 .table-wrap table {
   table-layout: fixed;
   width: 100%;
+  font-variant-numeric: tabular-nums;
 }
 
 .table-wrap table th,
@@ -1639,16 +1663,29 @@ td small {
   text-overflow: clip;
 }
 
-.table-wrap table td strong,
-.table-wrap table td small,
-.table-wrap table td .meaning-chip,
-.table-wrap table td .wire-value {
+.field-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.field-cell small {
+  flex: 0 0 64px;
+  width: 64px;
+  min-width: 64px;
+  max-width: 64px;
+  text-align: center;
+  box-sizing: border-box;
+  margin-right: 0;
+}
+
+.field-cell strong {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: clip;
   white-space: nowrap;
-  display: inline-block;
-  max-width: 100%;
-  vertical-align: middle;
 }
 
 .table-wrap table th:nth-child(1) {
