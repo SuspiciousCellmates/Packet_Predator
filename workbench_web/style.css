@@ -1572,11 +1572,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 
 .table-wrap {
-  max-height: 400px;
+  max-height: 460px;
   overflow-y: auto;
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+  box-sizing: border-box;
+  margin-top: 12px;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
 table {
@@ -1715,6 +1718,9 @@ td small {
 
 .meaning-chip {
   display: inline-block;
+  width: 96px;
+  text-align: center;
+  box-sizing: border-box;
   color: var(--cyan);
   background: var(--cyan-soft);
   border-radius: var(--radius-sm);
@@ -1722,6 +1728,7 @@ td small {
   font-size: var(--text-2xs);
   font-weight: 600;
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 .numeric {
