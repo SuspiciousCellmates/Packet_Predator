@@ -214,7 +214,7 @@ function renderResult(item, shouldScroll = true) {
 
   elements.fieldTable.innerHTML = item.field_rows.map((row) => `
     <tr>
-      <td><strong>${escaped(row.label)}</strong><small>${escaped(row.name)} · ${escaped(row.type)}</small></td>
+      <td><small>[${escaped(row.type)}]</small> <strong>${escaped(row.name)}</strong></td>
       <td>${annotationText(row.annotation)}</td>
       <td class="numeric">${escaped(valueText(row))}</td>
       <td class="wire-value">${escaped(row.value_hex)}</td>
@@ -581,4 +581,45 @@ elements.starterExample.addEventListener("click", () => {
   if (starter) chooseExample(starter.id);
 });
 
+function initColumnResizer() {
+  const table = document.querySelector('.table-wrap table');
+  if (!table) return;
+  const ths = table.querySelectorAll('thead th');
+  ths.forEach((th) => {
+    if (th.querySelector('.col-resizer')) return;
+    const resizer = document.createElement('div');
+    resizer.className = 'col-resizer';
+    th.style.position = 'relative';
+    th.appendChild(resizer);
+    
+    let startX, startWidth;
+    resizer.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      startX = e.clientX;
+      startWidth = th.getBoundingClientRect().width;
+      resizer.classList.add('active');
+      document.body.style.cursor = 'col-resize';
+      
+      const onMouseMove = (moveEvent) => {
+        const diff = moveEvent.clientX - startX;
+        const newWidth = Math.max(40, startWidth + diff);
+        th.style.width = `${newWidth}px`;
+        th.style.minWidth = `${newWidth}px`;
+      };
+      
+      const onMouseUp = () => {
+        resizer.classList.remove('active');
+        document.body.style.cursor = '';
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+      
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
+  });
+}
+
 initialise();
+initColumnResizer();

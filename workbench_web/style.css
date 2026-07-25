@@ -1281,6 +1281,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 
 .result-summary {
+  display: none;
   margin: 6px 0 0;
   color: var(--muted);
   font-size: var(--text-base);
@@ -1519,9 +1520,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 .envelope-grid > div {
   padding: 10px;
-  border: 1px solid rgba(97, 215, 220, 0.2);
+  border: 1px solid var(--line-accent);
+  border-top: 2px solid var(--acid);
   border-radius: var(--radius-md);
-  background: var(--cyan-soft);
+  background: var(--surface-card);
 }
 
 .envelope-grid small {
@@ -1550,7 +1552,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 
 .table-wrap {
+  max-height: 400px;
+  overflow-y: auto;
   overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
 }
 
 table {
@@ -1560,13 +1566,38 @@ table {
 }
 
 th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-card);
+  z-index: 5;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
   text-align: left;
-  color: var(--faint);
+  color: var(--acid);
   font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 8px 10px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 2px solid var(--acid);
+  font-weight: 700;
+  position: relative;
+  user-select: none;
+}
+
+.col-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 10;
+}
+
+.col-resizer:hover,
+.col-resizer.active {
+  background: var(--cyan);
+  opacity: 0.7;
 }
 
 td {
@@ -1576,17 +1607,73 @@ td {
 }
 
 td strong {
-  display: block;
+  display: inline;
   font-size: var(--text-xs);
   font-weight: 600;
+  vertical-align: middle;
 }
 
 td small {
-  display: block;
-  color: var(--faint);
-  margin-top: 2px;
+  display: inline-block;
+  color: var(--cyan);
+  background: var(--cyan-soft);
+  border: 1px solid var(--line-accent);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  margin-right: 6px;
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
+  font-weight: 500;
+  vertical-align: middle;
+}
+
+.table-wrap table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.table-wrap table th,
+.table-wrap table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.table-wrap table td strong,
+.table-wrap table td small,
+.table-wrap table td .meaning-chip,
+.table-wrap table td .wire-value {
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.table-wrap table th:nth-child(1) {
+  width: 260px;
+  min-width: 50px;
+}
+
+.table-wrap table th:nth-child(2) {
+  width: 140px;
+  min-width: 50px;
+}
+
+.table-wrap table th:nth-child(3) {
+  width: 100px;
+  min-width: 40px;
+}
+
+.table-wrap table th:nth-child(4) {
+  width: 180px;
+  min-width: 60px;
+}
+
+.table-wrap table th:nth-child(5) {
+  width: 80px;
+  min-width: 40px;
 }
 
 .meaning-chip {
@@ -1597,6 +1684,7 @@ td small {
   padding: 3px 8px;
   font-size: var(--text-2xs);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .numeric {

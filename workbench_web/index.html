@@ -62,7 +62,6 @@
             <div class="card-heading">
               <div>
                 <p class="eyebrow">Conformance Library</p>
-                <h3>Example frames</h3>
               </div>
             </div>
             <div class="search-wrap">
@@ -111,7 +110,6 @@
           <div class="card-heading">
             <div>
               <p class="eyebrow">Recent Packets</p>
-              <h3>Inspected in this session</h3>
             </div>
             <small>Clears when server stops</small>
           </div>
@@ -144,7 +142,7 @@
             <div>
               <p class="eyebrow accent" id="resultFamily">—</p>
               <h2 id="resultTitle">—</h2>
-              <p class="result-summary" id="resultSummary">—</p>
+              <p class="result-summary" id="resultSummary" hidden>—</p>
             </div>
             <div class="result-badges">
               <span id="messageValue">—</span>
@@ -193,12 +191,11 @@
           </div>
 
           <div class="tab-panel active" id="tab-fields" role="tabpanel">
-            <div class="field-note"><span>i</span> Labels are for readability; numeric values and byte offsets remain visible for verification.</div>
             <div class="envelope-grid" aria-label="Envelope fields">
-              <div><small>Wire generation</small><strong id="wireGeneration">—</strong><span>upper 2 bits · byte 0</span></div>
-              <div><small>Body length</small><strong id="bodyLength">—</strong><span>lower 6 bits · byte 0</span></div>
-              <div><small>Message type</small><strong id="headerMessageType">—</strong><span>byte 1</span></div>
-              <div><small>Route</small><strong id="headerRoute">—</strong><span>bytes 2–3</span></div>
+              <div><small>Wire generation</small><strong id="wireGeneration">—</strong></div>
+              <div><small>Body length</small><strong id="bodyLength">—</strong></div>
+              <div><small>Message type</small><strong id="headerMessageType">—</strong></div>
+              <div><small>Route</small><strong id="headerRoute">—</strong></div>
             </div>
             <div class="table-wrap">
               <table>
@@ -302,5 +299,8 @@
       </div>
     </main>
   <script src="/assets/app.js?v=20260725-2" defer></script>
+<!-- impeccable-live-start -->
+<script src="http://localhost:8400/live.js?token=c6704705-dbb2-470d-94f2-04f20a744f65"></script>
+<!-- impeccable-live-end -->
 </body>
 </html>
