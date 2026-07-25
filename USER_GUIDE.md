@@ -71,8 +71,9 @@ The large frame heading uses the exact protocol symbol, such as
 documentation. The surrounding sentence still explains the message in
 ordinary language.
 
-Use the **Typeface** selector in the top bar to choose **Sans** or
-**Monospace**. Packet Predator remembers that choice in the current browser.
+Use **Text size** in the top bar to choose **Comfortable**, **Large**, or
+**Extra large**. Large is the default. Use **Typeface** to choose **Sans** or
+**Monospace**. Packet Predator remembers both choices in the current browser.
 
 ## Your first five-minute tour
 

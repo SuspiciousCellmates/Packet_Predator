@@ -18,14 +18,24 @@
   --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --font-body: var(--font-sans);
+  --text-2xs: .72rem;
+  --text-xs: .8rem;
+  --text-sm: .9rem;
+  --text-base: 1rem;
+  --text-md: 1.125rem;
+  --text-lg: 1.4rem;
+  --text-xl: 1.75rem;
   font-family: var(--font-body);
 }
 
 html[data-font="mono"] { --font-body: var(--font-mono); }
+html, html[data-text-size="large"] { font-size: 20px; }
+html[data-text-size="comfortable"] { font-size: 18px; }
+html[data-text-size="extra-large"] { font-size: 22px; }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html { min-width: 320px; background: var(--ground); font-size: 17px; }
-body { margin: 0; min-height: 100vh; color: var(--ink); background: radial-gradient(circle at 74% -20%, rgba(57, 123, 115, .17), transparent 34%), var(--ground); }
+html { min-width: 320px; background: var(--ground); }
+body { margin: 0; min-height: 100vh; color: var(--ink); font-size: var(--text-base); background: radial-gradient(circle at 74% -20%, rgba(57, 123, 115, .17), transparent 34%), var(--ground); }
 button, input, textarea, select { font: inherit; }
 button, select { cursor: pointer; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--acid); outline-offset: 2px; }
@@ -250,6 +260,97 @@ td small { color: var(--faint); margin-top: 3px; font: 500 8px ui-monospace, SFM
 .journal-entry small { color: var(--muted); font-size: 10px; margin-top: 2px; }
 .journal-entry time { color: var(--faint); font: 500 8px ui-monospace, SFMono-Regular, Menlo, monospace; }
 
+/* Readable type scale. These declarations intentionally override the older
+   fixed pixel sizes so the operator's chosen root size reaches every view. */
+.brand strong,
+.card-heading h3,
+.replay-topline h3 { font-size: var(--text-md); }
+.brand small,
+.status-pill,
+.typeface-control select,
+.library-heading > p:last-child,
+.search-box input,
+.example-copy strong,
+.loading-block,
+.radio-grid strong,
+.radio-actions > p,
+.recording-picker select,
+.replay-picker-row > p,
+.transport-readout strong,
+.primary-button,
+.result-summary,
+.detail-card strong,
+table,
+.journal-entry strong { font-size: var(--text-sm); }
+.typeface-control,
+.eyebrow,
+.heading-row span,
+.example-code,
+.example-copy small,
+.truth-card strong,
+.radio-listening,
+.radio-grid small,
+.radio-grid span,
+.transmit-confirm,
+.no-actors,
+.recording-picker,
+.speed-picker,
+.transport-readout span,
+.secondary-button,
+.speed-picker select,
+.schedule-direction,
+.schedule-kind strong,
+.card-heading > small,
+.byte-count,
+.mode-field,
+.mode-field select,
+.error-panel > span,
+.error-panel strong,
+.error-panel p,
+.tab,
+.field-note,
+.envelope-grid strong,
+td strong,
+.numeric,
+.journal-entry small { font-size: var(--text-xs); }
+.family-label,
+.truth-card small,
+.transport-readout small,
+.replay-schedule-heading,
+.replay-schedule-heading small,
+.schedule-item time,
+.schedule-kind small,
+.schedule-note strong,
+.schedule-note small,
+.result-badges span,
+.capture-context > span,
+.capture-context strong,
+.capture-context p,
+.route-end small,
+.route-end span,
+.route-path,
+.detail-card > p:last-child,
+.envelope-grid small,
+.envelope-grid span,
+th,
+td small,
+.meaning-chip,
+.wire-value,
+.byte-legend,
+.byte-cell small,
+.byte-help,
+.journal-entry time { font-size: var(--text-2xs); }
+.heading-row h1,
+.radio-card h3 { font-size: var(--text-lg); }
+.hex-field textarea { font-size: var(--text-base); }
+.result-hero h2 { font-size: var(--text-xl); }
+.route-end strong,
+.byte-cell strong { font-size: var(--text-sm); }
+.empty-state h3 { font-size: var(--text-md); }
+.empty-state p { font-size: var(--text-sm); }
+.intro > div:first-child > p:last-child { font-size: var(--text-sm); }
+.intro h2 { font-size: clamp(1.8rem, 3vw, 2.5rem); }
+
 @media (max-width: 880px) {
   .workspace { grid-template-columns: 250px minmax(0, 1fr); }
   .inspector { padding: 34px 28px 70px; }
@@ -265,7 +366,7 @@ td small { color: var(--faint); margin-top: 3px; font: 500 8px ui-monospace, SFM
   .library-heading { padding: 20px 18px 12px; }
   .example-list { max-height: 265px; }
   .inspector { padding: 28px 16px 60px; }
-  .intro h2 { font-size: 27px; }
+  .intro h2 { font-size: 1.7rem; }
   .input-actions { align-items: stretch; flex-direction: column; }
   .replay-topline, .replay-dashboard { align-items: stretch; flex-direction: column; }
   .radio-grid { grid-template-columns: 1fr 1fr; }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Packet Predator local frame inspection workbench">
   <title>Packet Predator · Local Workbench</title>
-  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/style.css?v=20260725-2">
 </head>
 <body>
   <div class="shell">
@@ -18,6 +18,14 @@
         </span>
       </a>
       <div class="status-line" aria-live="polite">
+        <label class="typeface-control">
+          <span>Text size</span>
+          <select id="textSizePreference" aria-label="Workbench text size">
+            <option value="comfortable">Comfortable</option>
+            <option value="large">Large</option>
+            <option value="extra-large">Extra large</option>
+          </select>
+        </label>
         <label class="typeface-control">
           <span>Typeface</span>
           <select id="fontPreference" aria-label="Workbench typeface">
@@ -268,6 +276,6 @@
       </section>
     </main>
   </div>
-  <script src="/assets/app.js" defer></script>
+  <script src="/assets/app.js?v=20260725-2" defer></script>
 </body>
 </html>

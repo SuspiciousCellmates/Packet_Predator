@@ -11,7 +11,7 @@ const state = {
 };
 
 const elements = Object.fromEntries([
-  "fontPreference", "carrierStatus", "authorityStatus", "exampleCount", "exampleSearch", "exampleList",
+  "textSizePreference", "fontPreference", "carrierStatus", "authorityStatus", "exampleCount", "exampleSearch", "exampleList",
   "frameInput", "frameMode", "inputByteCount", "inspectButton", "errorPanel",
   "errorCode", "errorMessage", "emptyState", "resultPanel", "starterExample",
   "resultFamily", "resultTitle", "resultSummary", "messageValue", "representation",
@@ -27,6 +27,26 @@ const elements = Object.fromEntries([
   "radioCard", "radioProfile", "radioDevices", "radioFrequency", "radioChannel", "radioAddress",
   "radioCrc", "radioActivity", "radioPins", "transmitConfirm", "transmitButton",
 ].map((id) => [id, document.getElementById(id)]));
+
+function applyTextSize(preference) {
+  const choices = new Set(["comfortable", "large", "extra-large"]);
+  const selected = choices.has(preference) ? preference : "large";
+  document.documentElement.dataset.textSize = selected;
+  elements.textSizePreference.value = selected;
+  try {
+    window.localStorage.setItem("packet-predator-text-size", selected);
+  } catch (_) {
+    // The preference remains active for this page when browser storage is unavailable.
+  }
+}
+
+function storedTextSize() {
+  try {
+    return window.localStorage.getItem("packet-predator-text-size") || "large";
+  } catch (_) {
+    return "large";
+  }
+}
 
 function applyTypeface(preference) {
   const selected = preference === "mono" ? "mono" : "sans";
@@ -461,6 +481,7 @@ function bindTabs() {
 }
 
 async function initialise() {
+  applyTextSize(storedTextSize());
   applyTypeface(storedTypeface());
   bindTabs();
   try {
@@ -484,6 +505,7 @@ async function initialise() {
 }
 
 elements.exampleSearch.addEventListener("input", renderExamples);
+elements.textSizePreference.addEventListener("change", () => applyTextSize(elements.textSizePreference.value));
 elements.fontPreference.addEventListener("change", () => applyTypeface(elements.fontPreference.value));
 elements.frameInput.addEventListener("input", () => {
   elements.frameInput.dataset.origin = "pasted frame";
