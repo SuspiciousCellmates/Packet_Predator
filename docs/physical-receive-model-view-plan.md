@@ -283,9 +283,9 @@ Implementation is complete only when all of the following are true:
    receiver.
 10. `./scripts/check` passes and the archived runtime hashes remain unchanged.
 11. The naturally timed Game Controller `HELLO_RESULT` plus
-    `CAPABILITY_REQUEST` follow-up exchange is recorded and reviewed before
-    the active physical-adapter milestone is closed; no transmit-spacing or
-    retry change is part of this acceptance gate.
+    `CAPABILITY_REQUEST` follow-up exchange was recorded and reviewed on
+    2026-07-26 before the physical-adapter milestone closed; no
+    transmit-spacing or retry change was part of this acceptance gate.
 
 ## Explicit non-goals
 
@@ -298,7 +298,7 @@ Implementation is complete only when all of the following are true:
 - Claiming lossless radio operation beyond measured nRF905 capacity.
 - Redesigning the current workbench layout or visual language.
 
-The repository roadmap already places Game Controller and Game Master Console
-applications after the current physical-adapter milestone. Their transport
-topology and tooling should be designed in that future application milestone,
-not inferred by this receiver refactor.
+The repository roadmap places Game Controller authoritative-state work and the
+Game Master Console after the completed physical-adapter milestone. Their
+transport topology and tooling should be designed in those future application
+milestones, not inferred by this receiver refactor.

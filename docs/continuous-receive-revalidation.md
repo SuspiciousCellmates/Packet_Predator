@@ -12,10 +12,13 @@ Packet Predator sends NODE_HELLO
   → Packet Predator must capture both responses
 ```
 
-This is the open physical acceptance test for Packet Predator ADR 0006 and the
-Game Controller's discovery/enrollment milestone. The Controller's existing
-outbox behavior determines the natural interval between its two responses.
-Do not add a sleep, radio-spacing rule, retry, or other scheduling change.
+This is the retained reproduction procedure for the physical acceptance of
+Packet Predator ADR 0006 and the Game Controller's discovery/enrollment
+milestone. Acceptance was recorded on 2026-07-26 in
+[the nRF905 validation result](nrf905-validation-2026-07-24.md). The
+Controller's existing outbox behavior determines the natural interval between
+its two responses. Do not add a sleep, radio-spacing rule, retry, or other
+scheduling change.
 
 ## Roles and assumptions
 

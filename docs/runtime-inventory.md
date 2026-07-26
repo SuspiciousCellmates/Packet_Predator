@@ -13,7 +13,7 @@ The archived prototype files remain immutable evidence. The supported layered ru
 | Physical receive lifecycle | `packet_predator/receiver.py` | Application-owned worker waits for `DR` and feeds opaque frames to the service independently of browser connections |
 | Inspection history/model | `packet_predator/service.py`, `packet_predator/model.py` | Process-local newest-100 observations, receiver state, and revision notifications only; no game state |
 | JSON/static application | `packet_predator/web.py`, `workbench_web/` | Thin command/snapshot/SSE routes and a browser view that never drives physical receive |
-| Structured editor contract | `docs/editor-api-v1.md` | Registry-derived schema, codec-backed composition, immutable draft provenance, and explicit duplicate-safe transmit identity; implementation begins inside the active physical-validation milestone |
+| Structured editor contract | `docs/editor-api-v1.md` | Registry-derived schema, codec-backed composition, immutable draft provenance, and explicit duplicate-safe transmit identity; completed as part of physical-adapter validation |
 
 ## Keep as archived workbench intent
 

@@ -387,16 +387,16 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
         raise GuardError("missing required foundation files: " + ", ".join(missing))
     milestone = load_json(root / ".foundation/milestone.json")
     expected = {
-        "active_lane": "Now",
+        "active_lane": "Completed",
         "milestone_id": "nrf905-physical-adapter-validation",
-        "status": "active",
+        "status": "completed",
         "runtime_changes_allowed": True,
         "protocol_authority": "../Protocol_Contract",
         "runtime_baseline": ".foundation/runtime-baseline.json",
     }
     wrong = {key: (milestone.get(key), value) for key, value in expected.items() if milestone.get(key) != value}
     if wrong:
-        raise GuardError(f"active milestone metadata is invalid: {wrong}")
+        raise GuardError(f"milestone metadata is invalid: {wrong}")
     freeze = milestone.get("runtime_freeze")
     if not isinstance(freeze, dict) or freeze.get("enforced") is not False:
         raise GuardError("layered milestone must retain but supersede the all-runtime freeze")
@@ -447,15 +447,19 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
         raise GuardError("supported runtime baseline does not preserve the archive manifest")
 
     roadmap = (root / "docs/roadmap.md").read_text(encoding="utf-8")
-    if "## Now — nRF905 physical adapter validation" not in roadmap or milestone["milestone_id"] not in roadmap:
-        raise GuardError("docs/roadmap.md does not identify the active Now milestone")
+    if (
+        "`nrf905-physical-adapter-validation`: completed on 2026-07-26."
+        not in roadmap
+        or milestone["milestone_id"] not in roadmap
+    ):
+        raise GuardError("docs/roadmap.md does not identify the completed milestone")
     ordered = [
         "Reference codec and cross-language conformance suite released as Protocol Contract `1.0.1`.",
         "`layered-local-workbench`: hardware-free browser inspector, explicit inspect-only carrier, and layered supported entrypoint reviewed and accepted.",
         "`deterministic-replay-fake-transport`: finite recording replay, fake opaque-frame transport, exact clock controls, and capture provenance reviewed and accepted.",
-        "## Now — nRF905 physical adapter validation",
+        "`nrf905-physical-adapter-validation`: completed on 2026-07-26.",
         "## Next — Game Controller authoritative state reconstruction",
-        "The Game Controller is already a separate application and its discovery and",
+        "The Game Controller's discovery/enrollment slice is physically accepted through",
     ]
     positions = [roadmap.find(text) for text in ordered]
     if any(position < 0 for position in positions) or positions != sorted(positions):

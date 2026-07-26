@@ -1,9 +1,10 @@
 {
   "schema_version": 1,
-  "active_lane": "Now",
+  "active_lane": "Completed",
   "milestone_id": "nrf905-physical-adapter-validation",
-  "status": "active",
+  "status": "completed",
   "started": "2026-07-23",
+  "completed": "2026-07-26",
   "mission": "Validate exact 32-byte capture and deliberate manual transmission in both directions through two Raspberry Pi 5 and nRF905 benches.",
   "runtime_changes_allowed": true,
   "protocol_authority": "../Protocol_Contract",

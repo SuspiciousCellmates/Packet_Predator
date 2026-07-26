@@ -57,7 +57,7 @@ Dependency direction is web → service → model / receiver / replay catalogue 
 - `web/`: retain packet-workbench views where useful; quarantine map and game controls.
 - `simulator.py`: quarantine completely; preserve in Git until deterministic scenario replacement exists elsewhere.
 
-## Active physical-validation constraint
+## Completed physical-validation boundary
 
 ADR 0005, ADR 0006, and `.foundation/runtime-baseline.json` authorize one explicitly configured nRF905 adapter while retaining the old hash manifest as an archive-preservation check. Inspect-only remains the default. With a profile, application lifespan starts a signal-driven receiver before any browser is required and stops it before GPIO/SPI close. Receive, transmit, and close are serialized; codec-invalid frames remain visible without stopping capture. The adapter may capture a frame or execute one confirmed manual transmit request; it cannot construct responses, emulate a node, branch on message meaning, or implement Game Controller policy. Deterministic replay remains available under the ADR 0004 constraints.
 

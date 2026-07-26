@@ -2,10 +2,8 @@
 
 Status: passed in both directions on the two available Raspberry Pi 5 and original Packet Predator nRF905 HAT benches.
 
-Continuous-receive follow-up status: software implemented on 2026-07-25;
-physical Game Controller `HELLO_RESULT` plus `CAPABILITY_REQUEST`
-exchange reported working by the operator on 2026-07-26; saved evidence review
-is still pending.
+Continuous-receive follow-up status: physically accepted on 2026-07-26 through
+the retained Hardware Validation Console evidence described below.
 
 ## Purpose
 
@@ -108,7 +106,7 @@ It does not yet prove:
 - interoperability with future embedded node firmware; or
 - that nRF905 is the final transport choice.
 
-## Continuous-receive follow-up
+## Continuous-receive follow-up — accepted 2026-07-26
 
 The first browser integration serviced the receive FIFO only when the page made
 a request every 50 ms. Later testing missed a follow-up frame, so the successful
@@ -121,20 +119,34 @@ ordered queued follow-ups without a browser, immediate transmit-to-receive
 handoff, continued capture after a codec-invalid frame, visible adapter faults,
 subscriber resynchronization, and idempotent shutdown.
 
-No new physical result is claimed here. On the real Packet Predator–Radio
-Gateway–Game Controller path, Packet Predator must send an enrolled
-`NODE_HELLO` and capture the Controller's naturally consecutive
-`HELLO_RESULT(CAPABILITIES_REQUIRED)` and `CAPABILITY_REQUEST`. Run with the
-browser unopened, open, and reconnecting. Do not add transmitter delay, retry,
-or scheduling behavior. Append the sample count, exact order, byte comparisons,
-and observed loss here when that test is run.
+The full cross-product acceptance was subsequently run through the laptop
+Hardware Validation Console. Its retained capability bundle,
+`20260726-133147-controller-capability-ready-e92a95`, passed all 14 reviewed
+steps and the read-only verifier over its exact 34-file evidence set. Its
+separate discovery bundle,
+`20260726-133317-controller-discovery-capability-request-08435d`, passed all
+12 reviewed steps and retained 30 hash-checked evidence files.
 
-On 2026-07-26 the operator reported that this exchange was working nicely
-after correcting the local HTTP port used to command Packet Predator. That
-report is encouraging but is not yet a reviewed physical result: the
-before/after model JSON, exact two received frames, counts, chronological
-`journal_sequence` values, and Controller/Gateway revisions have not been
-appended here. Keep the milestone open until those artifacts are recorded.
+Both runs used clean Packet Predator `83dfac6`, Game Controller `eaec282`,
+Radio Gateway `fed17fb`, Protocol Contract `78ab6a8`, and Hardware Validation
+Console `92d9447` worktrees. In the verified capability run, Packet Predator
+captured `HELLO_RESULT(CAPABILITIES_REQUIRED)` at journal sequence 18 and
+`CAPABILITY_REQUEST` at sequence 19, 21 ms apart. The independent discovery
+run captured the same pair at sequences 25 and 26, 18 ms apart. Both captures
+were physical nRF905 observations while the receiver remained listening; no
+browser polling, transmitter delay, or RF retry was introduced.
+
+The capability chunk was correlated to request `1` and fingerprint
+`1662968791`; the Controller independently recorded one validated cache entry
+and `READY_FOR_SNAPSHOT` for serial `16909060` at endpoint `1`, with a
+quiescent outbox. The complete run directories remain ignored local evidence.
+Their manifest SHA-256 values are, respectively,
+`427508c334adaf43974a1b7d00d8454e5ce515e7e85b1d32706dbf6bfd6d864e`
+and `2036e83a55f262957fa32545b2484eb6ff712c3aa149e8a389b669f57ccdea08`.
+
+This closes the continuous-receive acceptance required by ADR 0006 and the
+physical-adapter milestone. It does not establish range, contention tolerance,
+long-duration reliability, or a transmit-spacing policy.
 
 Controlled-gap tests may follow as a separate characterization exercise after
 the unchanged exchange passes. They are not part of this acceptance gate and do
