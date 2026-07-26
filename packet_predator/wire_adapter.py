@@ -299,9 +299,20 @@ class WireAdapter:
         values: dict[str, str] = {}
         for field in definition["payload"]["fields"]:
             value = payload[field["name"]]
-            values[field["name"]] = (
-                bytes(value).hex() if field["type"] == "bytes" else str(value)
-            )
+            if field["type"] == "bytes":
+                if isinstance(value, str) and re.fullmatch(
+                    r"(?:[0-9a-fA-F]{2})*", value
+                ):
+                    values[field["name"]] = value.lower()
+                elif isinstance(value, (bytes, bytearray, memoryview)):
+                    values[field["name"]] = bytes(value).hex()
+                else:
+                    raise InspectionError(
+                        "EDITOR_BYTES",
+                        f"{field['name']} is not decoded byte data.",
+                    )
+            else:
+                values[field["name"]] = str(value)
         return values
 
     def inspect(self, frame_text: str, mode: str = "auto") -> dict[str, Any]:

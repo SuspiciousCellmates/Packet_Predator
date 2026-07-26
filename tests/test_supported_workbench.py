@@ -111,6 +111,28 @@ class SupportedWorkbenchTests(unittest.TestCase):
                     list(range(4, result["inspection"]["logical_bytes"])),
                 )
 
+    def test_decoded_bytes_fields_become_round_trip_editor_hex(self):
+        fixture = self.wire.examples_by_id["v1-capability-chunk"]
+        inspection = self.wire.inspect(fixture["padded_frame_hex"], "fixed")
+
+        values = self.wire.editor_values(
+            inspection["meaning"]["name"],
+            inspection["body"],
+        )
+        result = self.wire.compose(
+            inspection["meaning"]["name"],
+            source=inspection["route"]["source"],
+            destination=inspection["route"]["destination"],
+            payload=values,
+            representation="fixed",
+        )
+
+        self.assertEqual(
+            values["canonical_descriptor_bytes"],
+            "01000102010504deadbeef40021300",
+        )
+        self.assertEqual(result["fixed_frame_hex"], fixture["padded_frame_hex"])
+
     def test_editor_rejects_missing_or_extra_payload_fields(self):
         with self.assertRaises(InspectionError) as raised:
             self.wire.compose(
