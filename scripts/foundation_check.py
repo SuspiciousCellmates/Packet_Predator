@@ -454,8 +454,8 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
         "`layered-local-workbench`: hardware-free browser inspector, explicit inspect-only carrier, and layered supported entrypoint reviewed and accepted.",
         "`deterministic-replay-fake-transport`: finite recording replay, fake opaque-frame transport, exact clock controls, and capture provenance reviewed and accepted.",
         "## Now — nRF905 physical adapter validation",
-        "## Next — Game applications",
-        "1. Build Game Controller and Game Master Console as distinct deployed roles against the shared contract; a console platform or presentation components may be shared without sharing production capabilities.",
+        "## Next — Game Controller authoritative state reconstruction",
+        "The Game Controller is already a separate application and its discovery and",
     ]
     positions = [roadmap.find(text) for text in ordered]
     if any(position < 0 for position in positions) or positions != sorted(positions):

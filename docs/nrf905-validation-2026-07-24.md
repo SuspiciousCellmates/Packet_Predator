@@ -4,7 +4,8 @@ Status: passed in both directions on the two available Raspberry Pi 5 and origin
 
 Continuous-receive follow-up status: software implemented on 2026-07-25;
 physical Game Controller `HELLO_RESULT` plus `CAPABILITY_REQUEST`
-revalidation not yet run.
+exchange reported working by the operator on 2026-07-26; saved evidence review
+is still pending.
 
 ## Purpose
 
@@ -127,6 +128,13 @@ Gateway–Game Controller path, Packet Predator must send an enrolled
 browser unopened, open, and reconnecting. Do not add transmitter delay, retry,
 or scheduling behavior. Append the sample count, exact order, byte comparisons,
 and observed loss here when that test is run.
+
+On 2026-07-26 the operator reported that this exchange was working nicely
+after correcting the local HTTP port used to command Packet Predator. That
+report is encouraging but is not yet a reviewed physical result: the
+before/after model JSON, exact two received frames, counts, chronological
+`journal_sequence` values, and Controller/Gateway revisions have not been
+appended here. Keep the milestone open until those artifacts are recorded.
 
 Controlled-gap tests may follow as a separate characterization exercise after
 the unchanged exchange passes. They are not part of this acceptance gate and do

@@ -8,14 +8,23 @@ permissions:
   contents: read
 
 jobs:
-  foundation:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          path: Packet_Predator
           fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/checkout@v4
+        with:
+          repository: SuspiciousCellmates/Protocol_Contract
+          path: Protocol_Contract
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install -r requirements-local.txt
-      - run: ./scripts/check
+      - name: Install workbench dependencies
+        run: python -m pip install -r Packet_Predator/requirements-local.txt
+      - name: Run foundation guardrails and tests
+        run: ./scripts/check
+        working-directory: Packet_Predator
