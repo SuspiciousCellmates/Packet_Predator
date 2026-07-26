@@ -59,12 +59,56 @@ class SupportedWorkbenchTests(unittest.TestCase):
         self.assertEqual(len(fixed), 32)
         self.assertEqual(fixed.hex(), item["padded_frame_hex"])
 
+    def test_editor_schema_and_compose_are_contract_backed(self):
+        schema = self.wire.editor_message("NODE_HELLO")
+        message = schema["message"]
+        self.assertEqual(message["value"], 1)
+        reason = next(
+            field
+            for field in message["payload"]["fields"]
+            if field["name"] == "synchronization_reason"
+        )
+        self.assertEqual(reason["enum_values"]["ENDPOINT_ASSIGNED"], 5)
+
+        fixture = self.wire.examples_by_id["v1-node-hello"]
+        payload = dict(fixture["expected"]["payload"])
+        payload["synchronization_reason"] = 5
+        result = self.wire.compose(
+            "NODE_HELLO",
+            source=1,
+            destination=0,
+            payload=payload,
+            representation="fixed",
+        )
+        self.assertEqual(len(result["fixed_frame_hex"]), 64)
+        self.assertEqual(
+            result["inspection"]["body"]["synchronization_reason"],
+            5,
+        )
+
+    def test_editor_rejects_missing_or_extra_payload_fields(self):
+        with self.assertRaises(InspectionError) as raised:
+            self.wire.compose(
+                "NODE_HELLO",
+                source=1,
+                destination=0,
+                payload={"unexpected": 1},
+                representation="fixed",
+            )
+        self.assertEqual(raised.exception.code, "EDITOR_PAYLOAD_FIELDS")
+
     def test_service_is_truthfully_hardware_free_and_journals_manually(self):
         service = WorkbenchService(self.wire)
         status = service.status()
+        self.assertEqual(status["workbench_interface_version"], 1)
+        self.assertTrue(status["process_instance_id"].startswith("pp-"))
         self.assertEqual(status["carrier"]["mode"], "inspect-only")
         self.assertFalse(status["carrier"]["can_receive"])
         self.assertFalse(status["carrier"]["can_transmit"])
+        self.assertEqual(
+            service.model_state()["identity"]["process_instance_id"],
+            status["process_instance_id"],
+        )
 
         item = self.wire.list_examples()["examples"][0]
         service.inspect(item["frame_hex"], "auto", "unit example")

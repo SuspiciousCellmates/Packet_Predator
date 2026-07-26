@@ -91,6 +91,60 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(result["carrier"]["mode"], "inspect-only")
         self.assertFalse(result["carrier"]["can_transmit"])
         self.assertEqual(result["authority"]["authority_version"], "1.0.1")
+        self.assertEqual(result["workbench_interface_version"], 1)
+        self.assertTrue(result["process_instance_id"].startswith("pp-"))
+
+    def test_editor_metadata_and_compose_routes(self):
+        status, _, body = asyncio.run(
+            asgi_request("GET", "/api/v1/editor/messages/NODE_HELLO")
+        )
+        message = json.loads(body)["message"]
+        self.assertEqual(status, 200)
+        self.assertEqual(message["name"], "NODE_HELLO")
+
+        example = web._service().wire.examples_by_id["v1-node-hello"]
+        payload = dict(example["expected"]["payload"])
+        payload["synchronization_reason"] = 5
+        status, _, body = asyncio.run(
+            asgi_request(
+                "POST",
+                "/api/v1/editor/compose",
+                {
+                    "definition": "NODE_HELLO",
+                    "source": 1,
+                    "destination": 0,
+                    "values": payload,
+                    "representation": "fixed",
+                },
+            )
+        )
+        result = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(result["fixed_frame_hex"]), 64)
+        self.assertEqual(
+            result["inspection"]["body"]["synchronization_reason"],
+            5,
+        )
+
+    def test_compose_requires_strict_integer_addresses(self):
+        example = web._service().wire.examples_by_id["v1-node-hello"]
+        valid = {
+            "definition": "NODE_HELLO",
+            "source": 1,
+            "destination": 0,
+            "values": dict(example["expected"]["payload"]),
+            "representation": "fixed",
+        }
+
+        for field in ("source", "destination"):
+            for invalid in (True, "1", 1.0):
+                with self.subTest(field=field, invalid=invalid):
+                    malformed = dict(valid)
+                    malformed[field] = invalid
+                    status, _, _ = asyncio.run(
+                        asgi_request("POST", "/api/v1/editor/compose", malformed)
+                    )
+                    self.assertEqual(status, 422)
 
     def test_examples_and_inspection_use_the_released_authority(self):
         status, _, body = asyncio.run(asgi_request("GET", "/api/v1/examples"))

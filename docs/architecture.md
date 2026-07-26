@@ -27,6 +27,11 @@ The archived runtime remains frozen as evidence by `.foundation/runtime-freeze.s
 | Thin web layer | `packet_predator/web.py` | Own application lifespan, validate HTTP inputs, expose model snapshots/events, and serve static files |
 | Browser UI | `workbench_web/` | Observe model state; present fixture browsing, search, summaries, fields, validation feedback, and byte drill-down without driving physical receive |
 
+The physical-validation editor boundary is defined in
+[`editor-api-v1.md`](editor-api-v1.md). ADR 0007 requires composition through
+the wire adapter/reference codec, immutable source observations, explicit
+process/build identity, and duplicate-safe validation-client transmit IDs.
+
 Dependency direction is web → service → model / receiver / replay catalogue / transport / wire adapter. For live capture, the application-lifecycle receiver waits on the physical transport, the service inspects each opaque frame, and the model publishes the resulting observation. The browser reads a snapshot and subscribes to model-revision events; browser timing never calls or backpressures the radio. The replay catalogue resolves examples through an injected wire-adapter operation, then gives opaque frames to the transport. The nRF905 transport accepts only complete fixed frames; it does not decode their fields. Linux-specific imports are confined to `packet_predator/adapters/nrf905_linux.py`. The wire adapter alone loads the sibling reference codec. The supported runtime imports none of the archived modules.
 
 ## Target boundaries

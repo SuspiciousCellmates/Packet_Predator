@@ -101,6 +101,9 @@ class WireAdapter:
         self.definitions = {
             item["value"]: item for item in self.registry_data.get("messages", [])
         }
+        self.definitions_by_name = {
+            item["name"]: item for item in self.registry_data.get("messages", [])
+        }
         self.examples = list(self.example_data.get("fixtures", []))
         self.examples_by_id = {item["id"]: item for item in self.examples}
         if len(self.examples_by_id) != len(self.examples):
@@ -178,6 +181,105 @@ class WireAdapter:
             "authority_version": self.version,
             "example_count": len(rows),
             "examples": rows,
+        }
+
+    def editor_messages(self) -> dict[str, Any]:
+        """Return registry-derived metadata safe for structured editing."""
+
+        return {
+            "editor_interface_version": 1,
+            "authority_version": self.version,
+            "messages": [
+                self._editor_definition(definition)
+                for definition in self.registry_data["messages"]
+            ],
+        }
+
+    def editor_message(self, name: str) -> dict[str, Any]:
+        definition = self.definitions_by_name.get(name)
+        if definition is None:
+            raise InspectionError(
+                "EDITOR_MESSAGE_UNKNOWN",
+                f"No released message is named {name!r}.",
+            )
+        return {
+            "editor_interface_version": 1,
+            "authority_version": self.version,
+            "message": self._editor_definition(definition),
+        }
+
+    def compose(
+        self,
+        message_name: str,
+        source: int,
+        destination: int,
+        payload: dict[str, Any],
+        representation: str,
+    ) -> dict[str, Any]:
+        definition = self.definitions_by_name.get(message_name)
+        if definition is None:
+            raise InspectionError(
+                "EDITOR_MESSAGE_UNKNOWN",
+                f"No released message is named {message_name!r}.",
+            )
+        if representation not in {"logical", "fixed"}:
+            raise InspectionError(
+                "EDITOR_REPRESENTATION",
+                "representation must be logical or fixed.",
+            )
+        if not isinstance(payload, dict):
+            raise InspectionError(
+                "EDITOR_PAYLOAD_TYPE",
+                "payload must be a JSON object.",
+            )
+        fields = definition["payload"]["fields"]
+        expected = {field["name"] for field in fields}
+        actual = set(payload)
+        if actual != expected:
+            raise InspectionError(
+                "EDITOR_PAYLOAD_FIELDS",
+                f"{message_name} requires exactly {sorted(expected)}; found {sorted(actual)}.",
+            )
+
+        codec_payload: dict[str, Any] = {}
+        for field in fields:
+            name = field["name"]
+            value = payload[name]
+            if field["type"] == "bytes":
+                if not isinstance(value, str) or re.fullmatch(
+                    r"(?:[0-9a-fA-F]{2})*", value
+                ) is None:
+                    raise InspectionError(
+                        "EDITOR_BYTES",
+                        f"{name} must be an even-length hexadecimal string.",
+                    )
+                codec_payload[name] = bytes.fromhex(value)
+            else:
+                codec_payload[name] = value
+
+        logical = self.codec.encode_frame(
+            message_name,
+            source,
+            destination,
+            codec_payload,
+            padded=False,
+        )
+        fixed = self.codec.encode_frame(
+            message_name,
+            source,
+            destination,
+            codec_payload,
+            padded=True,
+        )
+        selected = logical if representation == "logical" else fixed
+        return {
+            "editor_interface_version": 1,
+            "authority_version": self.version,
+            "message_name": message_name,
+            "representation": representation,
+            "logical_frame_hex": logical.hex(),
+            "fixed_frame_hex": fixed.hex(),
+            "inspection": self.inspect(selected.hex(), representation),
         }
 
     def inspect(self, frame_text: str, mode: str = "auto") -> dict[str, Any]:
@@ -272,6 +374,36 @@ class WireAdapter:
                 "FIXED_FRAME_TOO_LONG", f"The released adapter frame limit is {size} bytes."
             )
         return logical + bytes([padding]) * (size - len(logical))
+
+    def _editor_definition(self, definition: dict[str, Any]) -> dict[str, Any]:
+        fields = []
+        for field in definition["payload"]["fields"]:
+            item = dict(field)
+            enum_name = field.get("enum")
+            flags_name = field.get("flags")
+            if enum_name is not None:
+                item["enum_values"] = dict(
+                    self.registry_data["enums"][enum_name]["values"]
+                )
+            if flags_name is not None:
+                item["flag_bits"] = dict(
+                    self.registry_data["flags"][flags_name]["defined_bits"]
+                )
+            fields.append(item)
+        return {
+            "value": definition["value"],
+            "name": definition["name"],
+            "display_name": self._display_name(definition["name"]),
+            "producers": list(definition["producers"]),
+            "consumers": list(definition["consumers"]),
+            "delivery": definition["delivery"],
+            "revision_scope": definition["revision_scope"],
+            "payload": {
+                "min_size": definition["payload"]["min_size"],
+                "max_size": definition["payload"]["max_size"],
+                "fields": fields,
+            },
+        }
 
     def _field_rows(self, definition: dict[str, Any], decoded: dict[str, Any]) -> list[dict[str, Any]]:
         rows = []

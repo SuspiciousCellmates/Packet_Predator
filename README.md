@@ -24,6 +24,10 @@ Open [http://127.0.0.1:8000](http://127.0.0.1:8000) in a browser. Choose an offi
 
 This setup installs only FastAPI and Uvicorn. It does not install the Raspberry Pi, SPI, GPIO, or nRF905 dependencies in the historical `requirements.txt`. See [the laptop workbench guide](docs/laptop-workbench.md) for troubleshooting and the optional environment settings.
 
+The concise [operator reference](docs/operator-reference.md) lists every
+supported script, environment setting, profile field, tunnel/port distinction,
+retention boundary, transmit safeguard, and common hardware failure.
+
 For the first physical bench, follow [nRF905 two-Raspberry-Pi validation](docs/nrf905-two-pi-bench.md). It documents the proven original-HAT pinout and required Pi 5 overlay, keeps all hardware and RF settings in a local profile, verifies the radio configuration by exact readback, and tests one known 32-byte frame in each direction. The default example profile cannot transmit. The first successful evidence is preserved in [the 2026-07-24 validation result](docs/nrf905-validation-2026-07-24.md). The remaining [continuous-receive revalidation](docs/continuous-receive-revalidation.md) uses the real Game Controller logic and requires Packet Predator to capture `HELLO_RESULT(CAPABILITIES_REQUIRED)` followed by `CAPABILITY_REQUEST`, without adding transmit spacing or retry behavior.
 
 Recording replay is explicit and non-reactive. The files contain a fixed timetable of released contract examples; they cannot branch, make a decision, create a response, or emulate a node. See [deterministic recordings](docs/deterministic-recordings.md) for the boundary and authoring rules.

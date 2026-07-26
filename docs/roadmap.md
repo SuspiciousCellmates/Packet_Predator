@@ -22,6 +22,12 @@ Milestone ID: `nrf905-physical-adapter-validation` (active).
 - Decode and journal physical frames through the existing reference-codec and service boundary.
 - Retain inspect-only startup when no adapter profile is supplied; add no node emulation, automatic replies, game state, or policy.
 - Decouple physical receive timing from the browser: continuously service the configured adapter into a process-local workbench model, then let the web layer observe that model without driving the radio. See [the physical receive, data model, and browser view plan](physical-receive-model-view-plan.md).
+- Complete the physical-validation operator reference and define the
+  contract-backed structured packet draft/editor needed to construct the
+  assigned re-hello without manually rewriting a full hexadecimal frame.
+- Expose stable process/build identity and duplicate-safe deliberate transmit
+  request identity for laptop-hosted validation tooling, without adding
+  scenario or Game Controller policy to Packet Predator.
 
 Physical evidence collected on 2026-07-24: the two original Packet Predator nRF905 HAT benches delivered exact released fixtures from Pi A to Pi B and Pi B to Pi A, with both messages decoded through Protocol Contract `1.0.1`. The continuous receiver and model-driven web view were implemented in software on 2026-07-25. On 2026-07-26 the operator reported that the physical Packet Predator–Radio Gateway–Game Controller follow-up exchange was working; milestone closure still requires the saved model/journal evidence to be appended and reviewed. The required exchange is an enrolled `NODE_HELLO` followed naturally by `HELLO_RESULT(CAPABILITIES_REQUIRED)` and `CAPABILITY_REQUEST`, without transmitter spacing or retry behavior. See [the validation result](nrf905-validation-2026-07-24.md) and [the revalidation runbook](continuous-receive-revalidation.md).
 

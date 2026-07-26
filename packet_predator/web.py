@@ -13,8 +13,9 @@ from typing import Literal
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictInt
 
+from . import __version__
 from .service import WorkbenchService
 from .adapters.nrf905 import Nrf905Error
 from .nrf905_profile import Nrf905ProfileError, load_nrf905_profile
@@ -46,6 +47,24 @@ class TransmitRequest(BaseModel):
     frame_hex: str = Field(min_length=1, max_length=512)
     mode: Literal["auto", "logical", "fixed"] = "auto"
     confirmed: bool = False
+    request_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+    )
+
+
+class ComposeRequest(BaseModel):
+    definition: str = Field(
+        min_length=1,
+        max_length=80,
+        pattern=r"^[A-Z][A-Z0-9_]*$",
+    )
+    source: StrictInt = Field(ge=0, le=255)
+    destination: StrictInt = Field(ge=0, le=255)
+    values: dict[str, object]
+    representation: Literal["logical", "fixed"] = "fixed"
 
 
 @lru_cache(maxsize=1)
@@ -90,7 +109,7 @@ async def _lifespan(application: FastAPI):
 app = FastAPI(
     title="Packet Predator",
     description="Local packet inspection, deterministic replay, and explicit physical-adapter workbench",
-    version="0.3.0",
+    version=__version__,
     lifespan=_lifespan,
 )
 
@@ -117,6 +136,44 @@ async def examples():
         return _service().examples()
     except _CONFIGURATION_ERRORS as exc:
         return _unavailable(exc)
+
+
+@app.get("/api/v1/editor/messages")
+async def editor_messages():
+    try:
+        return _service().editor_messages()
+    except _CONFIGURATION_ERRORS as exc:
+        return _unavailable(exc)
+
+
+@app.get("/api/v1/editor/messages/{message_name}")
+async def editor_message(message_name: str):
+    try:
+        return _service().editor_message(message_name)
+    except InspectionError as exc:
+        return JSONResponse(status_code=404, content={"error": exc.as_dict()})
+    except _CONFIGURATION_ERRORS as exc:
+        return _unavailable(exc)
+
+
+@app.post("/api/v1/editor/compose")
+async def compose(request: ComposeRequest):
+    try:
+        service = _service()
+    except _CONFIGURATION_ERRORS as exc:
+        return _unavailable(exc)
+    try:
+        return service.compose(
+            request.definition,
+            request.source,
+            request.destination,
+            request.values,
+            request.representation,
+        )
+    except InspectionError as exc:
+        return JSONResponse(status_code=422, content={"error": exc.as_dict()})
+    except service.wire.codec_error as exc:
+        return JSONResponse(status_code=422, content={"error": exc.as_dict()})
 
 
 @app.post("/api/v1/inspect")
@@ -262,7 +319,12 @@ async def transmit(request: TransmitRequest):
     except _CONFIGURATION_ERRORS as exc:
         return _unavailable(exc)
     try:
-        return service.transmit(request.frame_hex, request.mode, request.confirmed)
+        return service.transmit(
+            request.frame_hex,
+            request.mode,
+            request.confirmed,
+            request.request_id,
+        )
     except (InspectionError, TransportError, Nrf905Error) as exc:
         return JSONResponse(status_code=422, content={"error": exc.as_dict()})
     except service.wire.codec_error as exc:

@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import threading
 from datetime import datetime, timezone
+from collections import OrderedDict
+import os
 from pathlib import Path
 from typing import Any, Callable
 from uuid import uuid4
 
+from . import WORKBENCH_INTERFACE_VERSION, __version__
 from .model import WorkbenchModel
 from .replay import Recording, RecordingCatalog
 from .nrf905_transport import Nrf905Transport
@@ -36,6 +39,13 @@ class WorkbenchService:
         self._active_recording: Recording | None = None
         self._lock = threading.RLock()
         self._closed = False
+        self.process_instance_id = f"pp-{uuid4()}"
+        self.build_id = os.environ.get("PACKET_PREDATOR_BUILD_ID", "unknown")
+        self._transmit_results: OrderedDict[
+            str, tuple[tuple[str, str], dict[str, Any]]
+        ] = OrderedDict()
+        self._transmit_in_progress: dict[str, tuple[str, str]] = {}
+        self._transmit_result_capacity = 256
         self._receiver = (
             PhysicalReceiver(self.carrier, self.consume_physical, self.model.set_receiver_state)
             if isinstance(self.carrier, Nrf905Transport)
@@ -68,6 +78,10 @@ class WorkbenchService:
         return {
             "ready": True,
             "workbench": "Packet Predator",
+            "workbench_interface_version": WORKBENCH_INTERFACE_VERSION,
+            "application_version": __version__,
+            "process_instance_id": self.process_instance_id,
+            "build_id": self.build_id,
             "carrier": self.replay_carrier.status() if active else self.carrier.status(),
             "authority": self.wire.status(),
             "journal_entries": snapshot["journal"]["count"],
@@ -82,6 +96,28 @@ class WorkbenchService:
 
     def examples(self) -> dict[str, Any]:
         return self.wire.list_examples()
+
+    def editor_messages(self) -> dict[str, Any]:
+        return self.wire.editor_messages()
+
+    def editor_message(self, name: str) -> dict[str, Any]:
+        return self.wire.editor_message(name)
+
+    def compose(
+        self,
+        message_name: str,
+        source: int,
+        destination: int,
+        payload: dict[str, Any],
+        representation: str,
+    ) -> dict[str, Any]:
+        return self.wire.compose(
+            message_name,
+            source,
+            destination,
+            payload,
+            representation,
+        )
 
     def inspect(self, frame_text: str, mode: str, origin: str = "pasted frame") -> dict[str, Any]:
         result = self.wire.inspect(frame_text, mode)
@@ -124,23 +160,101 @@ class WorkbenchService:
     def replay_state(self) -> dict[str, Any]:
         return self._replay_response(self.replay_carrier.poll())
 
-    def transmit(self, frame_text: str, mode: str, confirmed: bool) -> dict[str, Any]:
+    def transmit(
+        self,
+        frame_text: str,
+        mode: str,
+        confirmed: bool,
+        request_id: str | None = None,
+    ) -> dict[str, Any]:
         if not confirmed:
             raise TransportError(
                 "TRANSMIT_CONFIRMATION_REQUIRED",
                 "Confirm this deliberate RF transmission in the workbench before sending.",
             )
-        carrier = self._physical_carrier()
         frame = self.wire.fixed_frame(frame_text, mode)
-        receiver_running = self._receiver is not None and self._receiver.running
-        if receiver_running:
-            self.model.set_receiver_state("transmitting")
+        identifier = request_id or f"pp-tx-{uuid4()}"
+        signature = (mode, frame.hex())
+        with self._lock:
+            cached = self._transmit_results.get(identifier)
+            if cached is not None:
+                previous_signature, previous_result = cached
+                if previous_signature != signature:
+                    raise TransportError(
+                        "TRANSMIT_REQUEST_CONFLICT",
+                        "request_id was already used with different transmit input.",
+                    )
+                replay = dict(previous_result)
+                replay["replayed_result"] = True
+                return replay
+            in_progress = self._transmit_in_progress.get(identifier)
+            if in_progress is not None:
+                if in_progress != signature:
+                    raise TransportError(
+                        "TRANSMIT_REQUEST_CONFLICT",
+                        "request_id is in progress with different transmit input.",
+                    )
+                raise TransportError(
+                    "TRANSMIT_IN_PROGRESS",
+                    "This transmit request is already in progress.",
+                )
+            self._transmit_in_progress[identifier] = signature
+
+        receiver_running = False
         try:
-            delivered = self.consume_physical(carrier.send(frame))
+            carrier = self._physical_carrier()
+            receiver_running = self._receiver is not None and self._receiver.running
+            if receiver_running:
+                self.model.set_receiver_state("transmitting")
+            try:
+                delivered = self.consume_physical(carrier.send(frame))
+            except Exception as exc:
+                error = (
+                    exc.as_dict()
+                    if hasattr(exc, "as_dict")
+                    else {
+                        "code": "TRANSMISSION_OUTCOME_UNKNOWN",
+                        "message": str(exc),
+                    }
+                )
+                unknown = {
+                    "request_id": identifier,
+                    "process_instance_id": self.process_instance_id,
+                    "replayed_result": False,
+                    "outcome": "unknown",
+                    "error": error,
+                    "delivered": [],
+                }
+                self._remember_transmit_result(identifier, signature, unknown)
+                return unknown
+            result = {
+                "request_id": identifier,
+                "process_instance_id": self.process_instance_id,
+                "replayed_result": False,
+                "outcome": "sent",
+                "error": None,
+                "carrier": carrier.status(),
+                "delivered": [delivered],
+            }
+            self._remember_transmit_result(identifier, signature, result)
+            return result
         finally:
+            with self._lock:
+                self._transmit_in_progress.pop(identifier, None)
             if receiver_running:
                 self.model.set_receiver_state("listening")
-        return {"carrier": carrier.status(), "delivered": [delivered]}
+
+    def _remember_transmit_result(
+        self,
+        identifier: str,
+        signature: tuple[str, str],
+        result: dict[str, Any],
+    ) -> None:
+        with self._lock:
+            self._transmit_results[identifier] = (signature, dict(result))
+            self._transmit_results.move_to_end(identifier)
+            while len(self._transmit_results) > self._transmit_result_capacity:
+                self._transmit_results.popitem(last=False)
 
     def journal(self) -> dict[str, Any]:
         return self.model.journal()
@@ -150,6 +264,13 @@ class WorkbenchService:
 
     def model_state(self) -> dict[str, Any]:
         snapshot = self.model.snapshot()
+        snapshot["identity"] = {
+            "workbench_interface_version": WORKBENCH_INTERFACE_VERSION,
+            "application_version": __version__,
+            "process_instance_id": self.process_instance_id,
+            "build_id": self.build_id,
+            "authority_version": self.wire.version,
+        }
         snapshot["physical_adapter"] = (
             self.carrier.status() if isinstance(self.carrier, Nrf905Transport) else None
         )

@@ -18,6 +18,16 @@ fi
 server_host=${PACKET_PREDATOR_HOST:-127.0.0.1}
 server_port=${PACKET_PREDATOR_PORT:-8000}
 
+if [ -z "${PACKET_PREDATOR_BUILD_ID:-}" ] && command -v git >/dev/null 2>&1; then
+    build_commit=$(git rev-parse --verify HEAD 2>/dev/null || true)
+    if [ -n "$build_commit" ]; then
+        if [ -n "$(git status --porcelain --untracked-files=normal 2>/dev/null || true)" ]; then
+            build_commit="${build_commit}-dirty"
+        fi
+        export PACKET_PREDATOR_BUILD_ID="$build_commit"
+    fi
+fi
+
 if [ -n "${PACKET_PREDATOR_ADAPTER_PROFILE:-}" ]; then
     echo "Packet Predator is starting with explicit adapter profile: $PACKET_PREDATOR_ADAPTER_PROFILE"
 else

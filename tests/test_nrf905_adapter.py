@@ -298,6 +298,80 @@ class PhysicalServiceTests(unittest.TestCase):
         self.assertEqual(result["delivered"][0]["capture"]["transport"], "nrf905")
         self.assertEqual(result["delivered"][0]["capture"]["direction"], "sent")
 
+    def test_service_deduplicates_named_transmit_request(self):
+        example = self.wire.resolve_example("v1-controller-beacon", "logical")
+        first = self.service.transmit(
+            example["frame_hex"],
+            "logical",
+            True,
+            "validation-run-1-step-4",
+        )
+        second = self.service.transmit(
+            example["frame_hex"],
+            "logical",
+            True,
+            "validation-run-1-step-4",
+        )
+
+        self.assertFalse(first["replayed_result"])
+        self.assertTrue(second["replayed_result"])
+        self.assertEqual(first["request_id"], second["request_id"])
+        self.assertEqual(self.service.model_state()["receiver"]["sent_count"], 1)
+
+    def test_service_rejects_conflicting_transmit_request_reuse(self):
+        first = self.wire.resolve_example("v1-controller-beacon", "logical")
+        second = self.wire.resolve_example("v1-node-status", "logical")
+        self.service.transmit(
+            first["frame_hex"],
+            "logical",
+            True,
+            "validation-run-1-step-4",
+        )
+
+        with self.assertRaises(TransportError) as raised:
+            self.service.transmit(
+                second["frame_hex"],
+                "logical",
+                True,
+                "validation-run-1-step-4",
+            )
+        self.assertEqual(raised.exception.code, "TRANSMIT_REQUEST_CONFLICT")
+
+    def test_named_request_is_not_retransmitted_after_uncertain_adapter_error(self):
+        example = self.wire.resolve_example("v1-controller-beacon", "logical")
+
+        def uncertain_transmit(frame):
+            raise Nrf905Error(
+                "NRF905_TRANSMIT_TIMEOUT",
+                "simulated uncertain transmit completion",
+            )
+
+        self.transport.device.transmit = uncertain_transmit
+        initial = self.service.transmit(
+            example["frame_hex"],
+            "logical",
+            True,
+            "validation-run-1-step-uncertain",
+        )
+        self.assertEqual(initial["request_id"], "validation-run-1-step-uncertain")
+        self.assertEqual(initial["process_instance_id"], self.service.process_instance_id)
+        self.assertFalse(initial["replayed_result"])
+        self.assertEqual(initial["outcome"], "unknown")
+        self.assertEqual(initial["error"]["code"], "NRF905_TRANSMIT_TIMEOUT")
+
+        recovered = self.service.transmit(
+            example["frame_hex"],
+            "logical",
+            True,
+            "validation-run-1-step-uncertain",
+        )
+        self.assertTrue(recovered["replayed_result"])
+        self.assertEqual(recovered["outcome"], "unknown")
+        self.assertEqual(
+            recovered["error"]["code"],
+            "NRF905_TRANSMIT_TIMEOUT",
+        )
+
     def test_service_decodes_and_journals_exact_received_frame(self):
         expected = self.wire.resolve_example("v1-node-status", "fixed")
         self.service.start()
