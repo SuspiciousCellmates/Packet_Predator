@@ -86,6 +86,31 @@ class SupportedWorkbenchTests(unittest.TestCase):
             5,
         )
 
+    def test_all_released_examples_recompose_to_identical_bytes(self):
+        for fixture in self.wire.examples:
+            with self.subTest(fixture=fixture["id"]):
+                result = self.wire.compose(
+                    fixture["message_name"],
+                    source=fixture["header"]["source"],
+                    destination=fixture["header"]["destination"],
+                    payload=dict(fixture["expected"]["payload"]),
+                    representation="fixed",
+                )
+                self.assertEqual(result["logical_frame_hex"], fixture["frame_hex"])
+                self.assertEqual(
+                    result["fixed_frame_hex"],
+                    fixture["padded_frame_hex"],
+                )
+                offsets = [
+                    offset
+                    for row in result["inspection"]["field_rows"]
+                    for offset in range(row["offset"], row["offset"] + row["size"])
+                ]
+                self.assertEqual(
+                    offsets,
+                    list(range(4, result["inspection"]["logical_bytes"])),
+                )
+
     def test_editor_rejects_missing_or_extra_payload_fields(self):
         with self.assertRaises(InspectionError) as raised:
             self.wire.compose(
@@ -96,6 +121,22 @@ class SupportedWorkbenchTests(unittest.TestCase):
                 representation="fixed",
             )
         self.assertEqual(raised.exception.code, "EDITOR_PAYLOAD_FIELDS")
+
+    def test_editor_preserves_full_u64_values_from_browser_decimal_text(self):
+        fixture = self.wire.examples_by_id["v1-node-hello"]
+        payload = dict(fixture["expected"]["payload"])
+        payload["permanent_device_serial"] = "18446744073709551615"
+        result = self.wire.compose(
+            "NODE_HELLO",
+            source=1,
+            destination=0,
+            payload=payload,
+            representation="fixed",
+        )
+        self.assertEqual(
+            result["inspection"]["body"]["permanent_device_serial"],
+            18446744073709551615,
+        )
 
     def test_service_is_truthfully_hardware_free_and_journals_manually(self):
         service = WorkbenchService(self.wire)
@@ -159,6 +200,31 @@ class BrowserAssetTests(unittest.TestCase):
             "transmitButton",
         ):
             self.assertIn(f'id="{identifier}"', html)
+
+    def test_structured_draft_controls_and_safety_logic_are_present(self):
+        html = (REPO_ROOT / "workbench_web/index.html").read_text(encoding="utf-8")
+        source = (REPO_ROOT / "workbench_web/app.js").read_text(encoding="utf-8")
+        for identifier in (
+            "draftBar",
+            "draftSource",
+            "draftDestination",
+            "draftUndo",
+            "draftRedo",
+            "draftRevert",
+            "draftDiscard",
+        ):
+            self.assertIn(f'id="{identifier}"', html)
+        for phrase in (
+            "/api/v1/editor/messages",
+            "/api/v1/editor/compose",
+            "/api/v1/editor/inspect",
+            "EDITOR_DRAFT_INVALID",
+            "transmitRequestId",
+            "window.confirm",
+            "highlightField",
+            "highlightByte",
+        ):
+            self.assertIn(phrase, source)
 
 
 if __name__ == "__main__":

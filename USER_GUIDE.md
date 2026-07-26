@@ -94,6 +94,18 @@ Start without a radio. This lets you learn the screen without transmitting anyth
 
 You do not need to understand the byte view to use Packet Predator. It exists so a developer can answer questions such as, “Did the radio change a byte?” or “Did both programs build the same message?”
 
+Every valid selected frame also opens as an **Editable draft**. Change an
+address or named value in **Fields** when you know the protocol meaning, or
+change a two-digit cell in **Bytes** when you need exact control. The other
+view updates after Protocol Contract validates the edit. Changed bytes receive
+an amber marker, and focusing a field highlights its bytes.
+
+**Undo**, **Redo**, and **Revert** keep the original fixture or observation
+intact. If a byte edit makes the frame invalid, Packet Predator preserves the
+draft and explains the codec error, but disables transmission until you undo,
+revert, or correct it. Choosing another frame while a modified draft is open
+requires confirmation.
+
 The list on the left contains other known-good examples. Selecting one loads and inspects it immediately. The search box helps find an example by its name or family.
 
 ## Playing a recorded exchange

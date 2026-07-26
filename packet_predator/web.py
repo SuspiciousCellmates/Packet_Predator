@@ -8,7 +8,7 @@ from functools import lru_cache
 import json
 import os
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
@@ -43,6 +43,30 @@ class ReplayControlRequest(BaseModel):
     speed: Literal[0.25, 0.5, 1.0, 2.0, 4.0] | None = None
 
 
+DraftFieldName = Annotated[
+    str,
+    Field(min_length=1, max_length=80, pattern=r"^(?:source|destination|[a-z][a-z0-9_]*)$"),
+]
+DraftByteOffset = Annotated[StrictInt, Field(ge=0, le=31)]
+
+
+class TransmitProvenance(BaseModel):
+    draft_id: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+    )
+    base_identity: str = Field(min_length=1, max_length=240)
+    changed_fields: list[DraftFieldName] = Field(default_factory=list, max_length=128)
+    changed_bytes: list[DraftByteOffset] = Field(default_factory=list, max_length=32)
+    console_run_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+    )
+
+
 class TransmitRequest(BaseModel):
     frame_hex: str = Field(min_length=1, max_length=512)
     mode: Literal["auto", "logical", "fixed"] = "auto"
@@ -53,6 +77,7 @@ class TransmitRequest(BaseModel):
         max_length=128,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
     )
+    provenance: TransmitProvenance | None = None
 
 
 class ComposeRequest(BaseModel):
@@ -170,6 +195,20 @@ async def compose(request: ComposeRequest):
             request.values,
             request.representation,
         )
+    except InspectionError as exc:
+        return JSONResponse(status_code=422, content={"error": exc.as_dict()})
+    except service.wire.codec_error as exc:
+        return JSONResponse(status_code=422, content={"error": exc.as_dict()})
+
+
+@app.post("/api/v1/editor/inspect")
+async def inspect_editor_draft(request: DecodeRequest):
+    try:
+        service = _service()
+    except _CONFIGURATION_ERRORS as exc:
+        return _unavailable(exc)
+    try:
+        return service.inspect_draft(request.frame_hex, request.mode)
     except InspectionError as exc:
         return JSONResponse(status_code=422, content={"error": exc.as_dict()})
     except service.wire.codec_error as exc:
@@ -324,6 +363,7 @@ async def transmit(request: TransmitRequest):
             request.mode,
             request.confirmed,
             request.request_id,
+            None if request.provenance is None else request.provenance.model_dump(),
         )
     except (InspectionError, TransportError, Nrf905Error) as exc:
         return JSONResponse(status_code=422, content={"error": exc.as_dict()})

@@ -7,7 +7,7 @@
   <title>Packet Predator · Local Workbench</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">  <link rel="stylesheet" href="/assets/style.css?v=20260725-3">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">  <link rel="stylesheet" href="/assets/style.css?v=20260726-1">
 </head>
 <body>
   <div class="shell">
@@ -155,6 +155,20 @@
             <div><strong id="captureIdentity">—</strong><p id="captureNote">—</p></div>
           </div>
 
+          <div class="draft-bar" id="draftBar" hidden>
+            <div>
+              <p class="eyebrow accent">Editable draft</p>
+              <strong id="draftStatus">Valid · unchanged</strong>
+              <small id="draftProvenance">Derived from the selected frame</small>
+            </div>
+            <div class="draft-actions" aria-label="Draft history controls">
+              <button class="secondary-button compact" id="draftUndo" type="button" disabled>Undo</button>
+              <button class="secondary-button compact" id="draftRedo" type="button" disabled>Redo</button>
+              <button class="secondary-button compact" id="draftRevert" type="button" disabled>Revert</button>
+              <button class="secondary-button compact" id="draftDiscard" type="button">Discard draft</button>
+            </div>
+          </div>
+
           <div class="route" aria-label="Frame route">
             <div class="route-end">
               <small>From</small><strong id="routeSource">—</strong><span id="routeSourceValue">—</span>
@@ -191,6 +205,15 @@
           </div>
 
           <div class="tab-panel active" id="tab-fields" role="tabpanel">
+            <div class="draft-route-controls" id="draftRouteControls" hidden>
+              <label>Source address
+                <input id="draftSource" type="number" min="0" max="255" step="1">
+              </label>
+              <label>Destination address
+                <input id="draftDestination" type="number" min="0" max="255" step="1">
+              </label>
+              <span>Addresses and payload fields are re-encoded by Protocol Contract.</span>
+            </div>
             <div class="envelope-grid" aria-label="Envelope fields">
               <div><small>Wire generation</small><strong id="wireGeneration">—</strong></div>
               <div><small>Body length</small><strong id="bodyLength">—</strong></div>
@@ -212,7 +235,7 @@
               <span><i class="padding-key"></i> Adapter padding</span>
             </div>
             <div class="byte-strip" id="byteStrip"></div>
-            <p class="byte-help">Byte numbers begin at zero. Hover or focus a byte to see its decimal value and role.</p>
+            <p class="byte-help">Byte numbers begin at zero. Edit a two-digit byte directly; invalid drafts are preserved but cannot be transmitted.</p>
           </div>
         </section>
       </div>
@@ -300,6 +323,6 @@
         </section>
       </div>
     </main>
-  <script src="/assets/app.js?v=20260725-3" defer></script>
+  <script src="/assets/app.js?v=20260726-1" defer></script>
 </body>
 </html>

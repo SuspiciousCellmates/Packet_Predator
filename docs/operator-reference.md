@@ -20,6 +20,17 @@ in [`nrf905-two-pi-bench.md`](nrf905-two-pi-bench.md).
 The browser observes the process-local model. It does not poll or pace the
 radio. Closing the page does not stop physical reception.
 
+Valid fixtures, pasted frames, replay entries, and captured observations fork
+into one browser-local editable draft. The Fields tab edits addresses, enums,
+flags, numbers, and byte fields through Contract-backed compose operations.
+The Bytes tab edits individual octets through a non-journaling draft decode.
+Undo, redo, revert, cross-highlighting, and base-byte diffs are presentation
+behavior; the selected journal observation is never modified.
+
+Invalid drafts remain visible but cannot be transmitted. A deliberate editor
+transmission includes draft/base provenance and exact changed fields/offsets
+in the local cached result. This metadata never enters the radio frame.
+
 ## Scripts
 
 | Command | Purpose | Important behavior |

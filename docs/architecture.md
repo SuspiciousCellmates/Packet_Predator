@@ -25,7 +25,7 @@ The archived runtime remains frozen as evidence by `.foundation/runtime-freeze.s
 | Workbench service | `packet_predator/service.py` | Turn fixture, pasted, replay-delivered, or physically received bytes into inspectable observations |
 | Presentation model | `packet_predator/model.py` | Retain the newest 100 immutable observations, receiver state, monotonic revisions, and subscriber notifications |
 | Thin web layer | `packet_predator/web.py` | Own application lifespan, validate HTTP inputs, expose model snapshots/events, and serve static files |
-| Browser UI | `workbench_web/` | Observe model state; present fixture browsing, search, summaries, fields, validation feedback, and byte drill-down without driving physical receive |
+| Browser UI | `workbench_web/` | Observe model state; fork immutable observations into local drafts; present fixture browsing, editable Fields/Bytes, synchronized diffs/history, validation feedback, and byte drill-down without driving physical receive |
 
 The physical-validation editor boundary is defined in
 [`editor-api-v1.md`](editor-api-v1.md). ADR 0007 requires composition through

@@ -68,8 +68,8 @@ class WebApiTests(unittest.TestCase):
         self.assertIn(b"Hardware-free inspection", body)
         self.assertIn(b'id="textSizePreference"', body)
         self.assertIn(b'id="fontPreference"', body)
-        self.assertIn(b"/assets/style.css?v=20260725-3", body)
-        self.assertIn(b"/assets/app.js?v=20260725-3", body)
+        self.assertIn(b"/assets/style.css?v=20260726-1", body)
+        self.assertIn(b"/assets/app.js?v=20260726-1", body)
         self.assertNotIn(b"localhost:8400", body)
         self.assertIn(b'id="resultSummary" hidden', body)
         self.assertLess(body.index(b'id="inputHeading"'), body.index(b'id="resultPanel"'))
@@ -145,6 +145,24 @@ class WebApiTests(unittest.TestCase):
                         asgi_request("POST", "/api/v1/editor/compose", malformed)
                     )
                     self.assertEqual(status, 422)
+
+    def test_editor_inspection_does_not_mutate_observation_journal(self):
+        example = web._service().wire.examples_by_id["v1-node-hello"]
+        before = web._service().journal()["count"]
+        status, _, body = asyncio.run(
+            asgi_request(
+                "POST",
+                "/api/v1/editor/inspect",
+                {
+                    "frame_hex": example["padded_frame_hex"],
+                    "mode": "fixed",
+                    "origin": "draft",
+                },
+            )
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["meaning"]["name"], "NODE_HELLO")
+        self.assertEqual(web._service().journal()["count"], before)
 
     def test_examples_and_inspection_use_the_released_authority(self):
         status, _, body = asyncio.run(asgi_request("GET", "/api/v1/examples"))

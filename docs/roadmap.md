@@ -29,6 +29,11 @@ Milestone ID: `nrf905-physical-adapter-validation` (active).
   request identity for laptop-hosted validation tooling, without adding
   scenario or Game Controller policy to Packet Predator.
 
+The structured editor, immutable draft provenance, Fields/Bytes synchronization,
+and duplicate-safe browser transmit identity are implemented. Physical
+acceptance through the laptop Hardware Validation Console remains in the
+cross-product validation phase.
+
 Physical evidence collected on 2026-07-24: the two original Packet Predator nRF905 HAT benches delivered exact released fixtures from Pi A to Pi B and Pi B to Pi A, with both messages decoded through Protocol Contract `1.0.1`. The continuous receiver and model-driven web view were implemented in software on 2026-07-25. On 2026-07-26 the operator reported that the physical Packet Predator–Radio Gateway–Game Controller follow-up exchange was working; milestone closure still requires the saved model/journal evidence to be appended and reviewed. The required exchange is an enrolled `NODE_HELLO` followed naturally by `HELLO_RESULT(CAPABILITIES_REQUIRED)` and `CAPABILITY_REQUEST`, without transmitter spacing or retry behavior. See [the validation result](nrf905-validation-2026-07-24.md) and [the revalidation runbook](continuous-receive-revalidation.md).
 
 Exit requires passing fake-backend adapter tests, clear malformed-profile and timeout failures, exact register readback on both Pis, exact fixture delivery in both RF directions, both repository checks, and human review of the physical evidence.

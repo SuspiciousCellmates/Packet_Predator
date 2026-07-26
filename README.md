@@ -6,7 +6,7 @@ Packet Predator is an experimental developer packet workbench for Suspicious Cel
 
 ## Current status
 
-The supported application is a layered browser workbench. By default it is hardware-free and uses the sibling Protocol Contract `1.0.1` reference codec to inspect all 38 conformance frames, hexadecimal bytes you paste, or frames released by a deliberately selected deterministic recording. The active physical milestone also provides an explicitly configured experimental nRF905 adapter. With a profile, the server listens continuously into a process-local observation model whether or not a browser is connected; browsers subscribe to that model and do not pace the radio. On 2026-07-24, two Raspberry Pi 5 and original Packet Predator HAT benches exchanged exact released frames successfully in both directions. The workbench never starts a radio without a profile, or starts a fake node, game coordinator, or autonomous scenario.
+The supported application is a layered browser workbench. By default it is hardware-free and uses the sibling Protocol Contract `1.0.1` reference codec to inspect and edit all 38 conformance frames, hexadecimal bytes you paste, or frames released by a deliberately selected deterministic recording. Valid frames open as provenance-bearing drafts: addresses and named Fields can be edited semantically, individual Bytes can be edited exactly, and undo/redo, validation, and byte diffs remain synchronized. The active physical milestone also provides an explicitly configured experimental nRF905 adapter. With a profile, the server listens continuously into a process-local observation model whether or not a browser is connected; browsers subscribe to that model and do not pace the radio. On 2026-07-24, two Raspberry Pi 5 and original Packet Predator HAT benches exchanged exact released frames successfully in both directions. The workbench never starts a radio without a profile, or starts a fake node, game coordinator, or autonomous scenario.
 
 The old web-simulator remains reconstructable at tag `packet-predator-v0-experimental`; its files are immutable, unsupported evidence. Shared protocol ownership lives in the standalone sibling [Protocol Contract repository](../Protocol_Contract/README.md). Packet Predator reads that authority and does not redefine its values.
 
@@ -20,7 +20,7 @@ cd Packet_Predator
 ./scripts/run-local
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000) in a browser. Choose an official example, paste frame hex, or select a finite recording and use its play, pause, step, reset, and speed controls. Each delivered frame reaches the same plain-language, field, byte, and journal views. Recent inspections are held in memory only and disappear when the server stops.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000) in a browser. Choose an official example, paste frame hex, or select a finite recording and use its play, pause, step, reset, and speed controls. Each valid frame opens as a new editable draft in the same plain-language, Fields, Bytes, and journal views. Captured observations remain immutable; the draft records its source and exact differences. Recent inspections are held in memory only and disappear when the server stops.
 
 This setup installs only FastAPI and Uvicorn. It does not install the Raspberry Pi, SPI, GPIO, or nRF905 dependencies in the historical `requirements.txt`. See [the laptop workbench guide](docs/laptop-workbench.md) for troubleshooting and the optional environment settings.
 

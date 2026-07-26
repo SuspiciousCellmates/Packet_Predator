@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 from datetime import datetime, timezone
 from collections import OrderedDict
+import json
 import os
 from pathlib import Path
 from typing import Any, Callable
@@ -42,9 +43,9 @@ class WorkbenchService:
         self.process_instance_id = f"pp-{uuid4()}"
         self.build_id = os.environ.get("PACKET_PREDATOR_BUILD_ID", "unknown")
         self._transmit_results: OrderedDict[
-            str, tuple[tuple[str, str], dict[str, Any]]
+            str, tuple[tuple[str, str, str], dict[str, Any]]
         ] = OrderedDict()
-        self._transmit_in_progress: dict[str, tuple[str, str]] = {}
+        self._transmit_in_progress: dict[str, tuple[str, str, str]] = {}
         self._transmit_result_capacity = 256
         self._receiver = (
             PhysicalReceiver(self.carrier, self.consume_physical, self.model.set_receiver_state)
@@ -123,6 +124,16 @@ class WorkbenchService:
         result = self.wire.inspect(frame_text, mode)
         return self._store(result, origin.strip()[:120] or "pasted frame", None)
 
+    def inspect_draft(self, frame_text: str, mode: str) -> dict[str, Any]:
+        """Decode draft bytes without adding them to the observation journal."""
+
+        result = self.wire.inspect(frame_text, mode)
+        result["editor_values"] = self.wire.editor_values(
+            result["meaning"]["name"],
+            result["body"],
+        )
+        return result
+
     def replay_catalog(self) -> dict[str, Any]:
         return {
             "recordings": self.recordings.list(),
@@ -166,6 +177,7 @@ class WorkbenchService:
         mode: str,
         confirmed: bool,
         request_id: str | None = None,
+        provenance: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if not confirmed:
             raise TransportError(
@@ -174,7 +186,12 @@ class WorkbenchService:
             )
         frame = self.wire.fixed_frame(frame_text, mode)
         identifier = request_id or f"pp-tx-{uuid4()}"
-        signature = (mode, frame.hex())
+        provenance_value = None if provenance is None else dict(provenance)
+        signature = (
+            mode,
+            frame.hex(),
+            json.dumps(provenance_value, separators=(",", ":"), sort_keys=True),
+        )
         with self._lock:
             cached = self._transmit_results.get(identifier)
             if cached is not None:
@@ -223,6 +240,7 @@ class WorkbenchService:
                     "replayed_result": False,
                     "outcome": "unknown",
                     "error": error,
+                    "provenance": provenance_value,
                     "delivered": [],
                 }
                 self._remember_transmit_result(identifier, signature, unknown)
@@ -233,6 +251,7 @@ class WorkbenchService:
                 "replayed_result": False,
                 "outcome": "sent",
                 "error": None,
+                "provenance": provenance_value,
                 "carrier": carrier.status(),
                 "delivered": [delivered],
             }
@@ -247,7 +266,7 @@ class WorkbenchService:
     def _remember_transmit_result(
         self,
         identifier: str,
-        signature: tuple[str, str],
+        signature: tuple[str, str, str],
         result: dict[str, Any],
     ) -> None:
         with self._lock:

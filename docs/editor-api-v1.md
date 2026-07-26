@@ -1,6 +1,6 @@
 # Packet Predator editor and validation API v1
 
-**Status:** Implementation contract
+**Status:** Implemented browser/editor contract
 
 **Date:** 2026-07-26
 
@@ -78,6 +78,20 @@ The server:
 5. returns canonical logical/fixed hexadecimal plus that inspection.
 
 The API never accepts a client-supplied message layout or enum catalogue.
+Integer fields accept JSON integers or unsigned decimal strings. Decimal
+strings allow the browser to preserve the complete protocol `u64` range
+without JavaScript-number rounding.
+
+## Draft byte inspection
+
+```text
+POST /api/v1/editor/inspect
+```
+
+This route applies the same strict reference-codec decode to draft bytes
+without adding an observation to the workbench journal. The ordinary
+`/api/v1/inspect` route retains its existing behavior for deliberate pasted
+observations.
 
 ## Draft provenance
 
@@ -99,6 +113,11 @@ Draft provenance is local metadata and is never added to the RF frame.
 `POST /api/carrier/transmit` retains profile permission, codec validation, and
 one-shot confirmation. A validation client additionally supplies
 `request_id`, a 1–128 character supported identifier.
+
+An editor transmission also supplies local `provenance`: draft ID, base
+identity, changed field names, changed byte offsets, and an optional Console
+run ID. The cached result returns this metadata unchanged. It is not encoded
+into the over-air frame.
 
 For one Packet Predator process:
 

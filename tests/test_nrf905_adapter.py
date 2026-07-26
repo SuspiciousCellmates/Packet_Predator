@@ -300,22 +300,32 @@ class PhysicalServiceTests(unittest.TestCase):
 
     def test_service_deduplicates_named_transmit_request(self):
         example = self.wire.resolve_example("v1-controller-beacon", "logical")
+        provenance = {
+            "draft_id": "pp-draft-test",
+            "base_identity": "fixture:v1-controller-beacon",
+            "changed_fields": ["destination"],
+            "changed_bytes": [3],
+            "console_run_id": None,
+        }
         first = self.service.transmit(
             example["frame_hex"],
             "logical",
             True,
             "validation-run-1-step-4",
+            provenance,
         )
         second = self.service.transmit(
             example["frame_hex"],
             "logical",
             True,
             "validation-run-1-step-4",
+            provenance,
         )
 
         self.assertFalse(first["replayed_result"])
         self.assertTrue(second["replayed_result"])
         self.assertEqual(first["request_id"], second["request_id"])
+        self.assertEqual(first["provenance"], provenance)
         self.assertEqual(self.service.model_state()["receiver"]["sent_count"], 1)
 
     def test_service_rejects_conflicting_transmit_request_reuse(self):

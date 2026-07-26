@@ -254,6 +254,10 @@ class WireAdapter:
                         f"{name} must be an even-length hexadecimal string.",
                     )
                 codec_payload[name] = bytes.fromhex(value)
+            elif isinstance(value, str) and re.fullmatch(r"(?:0|[1-9][0-9]*)", value):
+                # Decimal strings preserve the complete u64 range in browser JSON,
+                # where JavaScript numbers cannot represent every protocol integer.
+                codec_payload[name] = int(value)
             else:
                 codec_payload[name] = value
 
@@ -279,8 +283,26 @@ class WireAdapter:
             "representation": representation,
             "logical_frame_hex": logical.hex(),
             "fixed_frame_hex": fixed.hex(),
+            "editor_values": self.editor_values(message_name, codec_payload),
             "inspection": self.inspect(selected.hex(), representation),
         }
+
+    def editor_values(
+        self, message_name: str, payload: dict[str, Any]
+    ) -> dict[str, str]:
+        definition = self.definitions_by_name.get(message_name)
+        if definition is None:
+            raise InspectionError(
+                "EDITOR_MESSAGE_UNKNOWN",
+                f"No released message is named {message_name!r}.",
+            )
+        values: dict[str, str] = {}
+        for field in definition["payload"]["fields"]:
+            value = payload[field["name"]]
+            values[field["name"]] = (
+                bytes(value).hex() if field["type"] == "bytes" else str(value)
+            )
+        return values
 
     def inspect(self, frame_text: str, mode: str = "auto") -> dict[str, Any]:
         compact, raw = _normalise_hex(frame_text)
