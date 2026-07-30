@@ -458,8 +458,8 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
         "`layered-local-workbench`: hardware-free browser inspector, explicit inspect-only carrier, and layered supported entrypoint reviewed and accepted.",
         "`deterministic-replay-fake-transport`: finite recording replay, fake opaque-frame transport, exact clock controls, and capture provenance reviewed and accepted.",
         "`nrf905-physical-adapter-validation`: completed on 2026-07-26.",
-        "## Next — Game Controller authoritative state reconstruction",
-        "The Game Controller's discovery/enrollment slice is physically accepted through",
+        "## Current supporting role — no new Packet Predator milestone selected",
+        "The Game Controller has since completed authoritative state reconstruction,",
     ]
     positions = [roadmap.find(text) for text in ordered]
     if any(position < 0 for position in positions) or positions != sorted(positions):

@@ -17,5 +17,5 @@
     "replacement_adr": "docs/adr/0006-decouple-physical-receive-from-browser.md",
     "legacy_files_remain_immutable": true
   },
-  "next_milestone": "game-controller-authoritative-state-reconstruction"
+  "next_milestone": "not-selected"
 }

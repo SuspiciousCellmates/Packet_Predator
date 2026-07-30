@@ -21,18 +21,21 @@ Milestones are sequential. A later milestone cannot begin until the preceding mi
   correlated capability transfer through `READY_FOR_SNAPSHOT`. See the
   [physical validation record](nrf905-validation-2026-07-24.md).
 
-## Next — Game Controller authoritative state reconstruction
+## Current supporting role — no new Packet Predator milestone selected
 
-The Game Controller's discovery/enrollment slice is physically accepted through
-capability transfer and `READY_FOR_SNAPSHOT`. Its next milestone reconstructs
-authoritative no-session and component state, sends atomic snapshots, and
-requires `STATE_APPLIED`.
+The Game Controller has since completed authoritative state reconstruction,
+physically accepted initial snapshot convergence, and implemented its
+hardware-free lobby/kiosk milestone. Packet Predator remains the stable
+supporting inspection and physical-validation workbench for those component
+boundaries.
 
-Packet Predator remains supporting inspection and validation tooling. It does
-not absorb Game Controller policy or Game Master Console workflows.
+No new Packet Predator product milestone is selected. New work here should be
+driven by a concrete inspection or physical-validation need and must not absorb
+Game Controller policy, Scenario Simulator behavior, or Game Master Console
+workflows.
 
-## Later — Fixed order
+## Later considerations
 
-- Build the Game Master Console as a distinct privileged application against
-  reviewed Game Controller APIs.
+- Support later Game Controller and Game Master Console validation only through
+  reviewed, deliberately narrow interfaces.
 - Validate additional transport adapters only when a concrete need justifies them.
