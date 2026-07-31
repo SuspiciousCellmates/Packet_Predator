@@ -2,24 +2,49 @@ name: check
 
 on:
   push:
+    branches:
+      - main
   pull_request:
+  workflow_dispatch:
+    inputs:
+      protocol_ref:
+        description: Protocol Contract branch, tag, or commit
+        required: false
+        default: main
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           path: Packet_Predator
           fetch-depth: 0
           fetch-tags: true
+          persist-credentials: false
+      - name: Require private sibling read token
+        env:
+          SIBLING_REPO_TOKEN: ${{ secrets.SIBLING_REPO_TOKEN }}
+        run: |
+          if [ -z "$SIBLING_REPO_TOKEN" ]; then
+            echo "::error::Configure the selected-repository SIBLING_REPO_TOKEN Actions secret with read-only Contents access."
+            exit 1
+          fi
       - uses: actions/checkout@v4
         with:
           repository: SuspiciousCellmates/Protocol_Contract
           path: Protocol_Contract
+          ref: ${{ inputs.protocol_ref || 'main' }}
+          token: ${{ secrets.SIBLING_REPO_TOKEN }}
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
