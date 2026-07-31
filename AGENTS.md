@@ -63,6 +63,15 @@ current state without chat history or source-code archaeology.
   behavior, boundary, operation, or decision. Never claim hardware validation
   or support that has not actually occurred.
 
+## Validation impact
+
+Changes to the supported workbench require repository tests for the affected
+service, transport, editor, receiver, or browser boundary. If a published
+inspection/transmit interface used by Hardware Validation Console changes,
+update that Console's interface, scenario, failure, and evidence-verifier tests
+in the same coordinated work. Packet Predator must not absorb Scenario
+Simulator actors or Controller policy to make an integration test convenient.
+
 ## Completion
 
 Run `./scripts/check` before reporting completion. Preserve the archived-runtime hashes and do not add an architecture exception merely to make a check pass. ADR 0005 and `.foundation/runtime-baseline.json` authorize the nRF905 validation boundary; changing that boundary requires another ADR.
