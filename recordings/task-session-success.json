@@ -3,7 +3,7 @@
   "id": "task-session-success",
   "title": "Recorded task session",
   "description": "A deliberate frame sequence connecting a Player scan, Task Node session, completion report, and controller recording confirmation.",
-  "authority_version": "1.0.1",
+  "authority_version": "1.0.2",
   "frame_mode": "logical",
   "duration_ms": 3400,
   "entries": [

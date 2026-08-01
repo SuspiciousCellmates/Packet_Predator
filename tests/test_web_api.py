@@ -90,7 +90,7 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(result["carrier"]["mode"], "inspect-only")
         self.assertFalse(result["carrier"]["can_transmit"])
-        self.assertEqual(result["authority"]["authority_version"], "1.0.1")
+        self.assertEqual(result["authority"]["authority_version"], "1.0.2")
         self.assertEqual(result["workbench_interface_version"], 1)
         self.assertTrue(result["process_instance_id"].startswith("pp-"))
 

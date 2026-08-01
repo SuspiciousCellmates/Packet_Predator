@@ -103,7 +103,7 @@ class RecordingValidationTests(unittest.TestCase):
             "id": "small-recording",
             "title": "Small recording",
             "description": "A finite validation example.",
-            "authority_version": "1.0.1",
+            "authority_version": "1.0.2",
             "frame_mode": "logical",
             "duration_ms": 100,
             "entries": [
@@ -127,7 +127,7 @@ class RecordingValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.write(root, self.valid_data())
-            item = RecordingCatalog(root, "1.0.1", self.resolver).get("small-recording")
+            item = RecordingCatalog(root, "1.0.2", self.resolver).get("small-recording")
             self.assertEqual(item.frames[0].frame, bytes.fromhex("40010100"))
             self.assertEqual(item.frames[0].at_ms, 100)
 
@@ -138,7 +138,7 @@ class RecordingValidationTests(unittest.TestCase):
             data["entries"][0]["condition"] = "invent a reply"
             self.write(root, data)
             with self.assertRaisesRegex(RecordingError, "must contain exactly"):
-                RecordingCatalog(root, "1.0.1", self.resolver)
+                RecordingCatalog(root, "1.0.2", self.resolver)
 
     def test_out_of_order_timing_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -148,7 +148,7 @@ class RecordingValidationTests(unittest.TestCase):
             data["entries"][1]["at_ms"] = 80
             self.write(root, data)
             with self.assertRaisesRegex(RecordingError, "nondecreasing order"):
-                RecordingCatalog(root, "1.0.1", self.resolver)
+                RecordingCatalog(root, "1.0.2", self.resolver)
 
     def test_authority_version_mismatch_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -157,10 +157,10 @@ class RecordingValidationTests(unittest.TestCase):
             data["authority_version"] = "9.9.9"
             self.write(root, data)
             with self.assertRaisesRegex(RecordingError, "expects authority"):
-                RecordingCatalog(root, "1.0.1", self.resolver)
+                RecordingCatalog(root, "1.0.2", self.resolver)
 
     def test_repository_recording_shapes_validate_without_runtime_authority(self):
-        catalog = RecordingCatalog(REPO_ROOT / "recordings", "1.0.1", self.resolver)
+        catalog = RecordingCatalog(REPO_ROOT / "recordings", "1.0.2", self.resolver)
         self.assertEqual(
             {item["id"] for item in catalog.list()},
             {"node-onboarding", "retained-outcome-retry", "task-session-success"},

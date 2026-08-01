@@ -3,7 +3,7 @@
   "id": "retained-outcome-retry",
   "title": "Retained outcome retry",
   "description": "The same Task outcome appears twice before its recording confirmation, making duplicate delivery easy to inspect repeatably.",
-  "authority_version": "1.0.1",
+  "authority_version": "1.0.2",
   "frame_mode": "fixed",
   "duration_ms": 700,
   "entries": [

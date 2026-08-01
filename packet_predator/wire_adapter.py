@@ -71,7 +71,7 @@ class WireAdapter:
         if missing:
             joined = ", ".join(str(path) for path in missing)
             raise AuthorityError(
-                "The sibling Protocol Contract 1.0.1 checkout is incomplete. Missing: " + joined
+                "The sibling Protocol Contract 1.0.2 checkout is incomplete. Missing: " + joined
             )
 
         authority_text = str(self.authority_root)
@@ -86,9 +86,9 @@ class WireAdapter:
 
         self.registry_data = _read_object(registry_path)
         self.example_data = _read_object(examples_path)
-        if self.registry_data.get("version") != "1.0.1":
+        if self.registry_data.get("version") != "1.0.2":
             raise AuthorityError(
-                "Packet Predator currently expects released Protocol Contract 1.0.1; "
+                "Packet Predator currently expects released Protocol Contract 1.0.2; "
                 f"found {self.registry_data.get('version')!r}."
             )
         if self.registry_data.get("status") != "stable":

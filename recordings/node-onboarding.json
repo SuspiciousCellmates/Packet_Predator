@@ -3,7 +3,7 @@
   "id": "node-onboarding",
   "title": "Node onboarding",
   "description": "A fixed recording of one Player Node introducing itself and applying the initial state snapshot that follows.",
-  "authority_version": "1.0.1",
+  "authority_version": "1.0.2",
   "frame_mode": "logical",
   "duration_ms": 1500,
   "entries": [

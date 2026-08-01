@@ -6,7 +6,7 @@ The archived prototype files remain immutable evidence. The supported layered ru
 
 | Capability | Location | Boundary |
 |---|---|---|
-| v1 frame decode and fixture catalog | `packet_predator/wire_adapter.py` | Delegates to sibling Protocol Contract `1.0.1`; defines no shared values |
+| v1 frame decode and fixture catalog | `packet_predator/wire_adapter.py` | Delegates to sibling Protocol Contract `1.0.2`; defines no shared values |
 | Recording catalogue | `packet_predator/replay.py`, `recordings/` | Finite ordered fixture references with validated timing; no executable scenario behavior |
 | Hardware-free transports | `packet_predator/transport.py` | Inspect-only startup plus explicitly selected deterministic replay; neither transmits |
 | Experimental nRF905 transport | `packet_predator/adapters/`, `packet_predator/nrf905_profile.py`, `packet_predator/nrf905_transport.py` | Explicit profile only; exact register readback, signal-driven capture, and individually confirmed manual transmission; no message semantics or automatic reply |
