@@ -10,6 +10,7 @@ The archived prototype files remain immutable evidence. The supported layered ru
 | Recording catalogue | `packet_predator/replay.py`, `recordings/` | Finite ordered fixture references with validated timing; no executable scenario behavior |
 | Hardware-free transports | `packet_predator/transport.py` | Inspect-only startup plus explicitly selected deterministic replay; neither transmits |
 | Experimental nRF905 transport | `packet_predator/adapters/`, `packet_predator/nrf905_profile.py`, `packet_predator/nrf905_transport.py` | Explicit profile only; exact register readback, signal-driven capture, and individually confirmed manual transmission; no message semantics or automatic reply |
+| Pi service deployment | `packet_predator/systemd.py`, `packaging/`, `scripts/*systemd*` | Host-rendered unit preserves explicit-profile startup, ordinary-user hardware permissions, loopback HTTP, and graceful radio shutdown |
 | Physical receive lifecycle | `packet_predator/receiver.py` | Application-owned worker waits for `DR` and feeds opaque frames to the service independently of browser connections |
 | Inspection history/model | `packet_predator/service.py`, `packet_predator/model.py` | Process-local newest-100 observations, receiver state, and revision notifications only; no game state |
 | JSON/static application | `packet_predator/web.py`, `workbench_web/` | Thin command/snapshot/SSE routes and a browser view that never drives physical receive |

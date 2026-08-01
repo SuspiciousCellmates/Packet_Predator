@@ -61,6 +61,9 @@ Stop Packet Predator before probing because only one process can own its radio:
   probe
 ```
 
+If Packet Predator is managed by systemd, stop it before the manual probe and
+restart it afterward. Do not run a probe concurrently with the service.
+
 On the Radio Gateway Pi:
 
 ```sh
@@ -133,11 +136,18 @@ cd ~/Suspicious_Cellmates/Radio_Gateway
 ./scripts/systemd-status
 ```
 
-Start Packet Predator on its Pi:
+Start Packet Predator on its Pi manually:
 
 ```sh
 cd ~/Suspicious_Cellmates/Packet_Predator
 ./scripts/run-rpi config/nrf905-bench.local.json
+```
+
+Or, for an installed service:
+
+```sh
+cd ~/Suspicious_Cellmates/Packet_Predator
+./scripts/systemd-status
 ```
 
 From the Controller laptop, create a tunnel to Packet Predator:

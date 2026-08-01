@@ -186,6 +186,18 @@ cd ~/Suspicious_Cellmates/Packet_Predator
 ./scripts/run-rpi config/nrf905-bench.local.json
 ```
 
+A prepared Pi can instead install the tracked boot service once, after which
+Packet Predator starts without a dedicated terminal:
+
+```sh
+./scripts/install-systemd-service config/nrf905-bench.local.json
+./scripts/systemd-status
+```
+
+See [unattended Packet Predator startup](docs/systemd-deployment.md) for the
+one-time safety checks and routine update commands. Do not use the manual and
+systemd startup methods at the same time.
+
 By default, the webpage remains private to that Pi. From another computer, an SSH connection can safely carry the page to a local browser port. For Pi A, a prepared bench might use:
 
 ```sh

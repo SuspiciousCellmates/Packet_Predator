@@ -12,6 +12,7 @@
     "transport": "packet_predator/transport.py",
     "adapter_root": "packet_predator/adapters",
     "adapter_profile": "packet_predator/nrf905_profile.py",
+    "pi_service_renderer": "packet_predator/systemd.py",
     "physical_transport": "packet_predator/nrf905_transport.py",
     "physical_receiver": "packet_predator/receiver.py",
     "service": "packet_predator/service.py",

@@ -34,6 +34,10 @@ driven by a concrete inspection or physical-validation need and must not absorb
 Game Controller policy, Scenario Simulator behavior, or Game Master Console
 workflows.
 
+The stable supporting deployment includes an optional host-rendered systemd
+unit for unattended Pi startup. It preserves the existing explicit-profile,
+loopback-only physical runtime rather than introducing a new product mode.
+
 ## Later considerations
 
 - Support later Game Controller and Game Master Console validation only through

@@ -22,6 +22,7 @@ The archived runtime remains frozen as evidence by `.foundation/runtime-freeze.s
 | Physical adapter | `packet_predator/adapters/nrf905.py`, `packet_predator/adapters/nrf905_linux.py`, `packet_predator/nrf905_transport.py` | Configure and move opaque fixed frames through an explicitly selected nRF905; isolate Linux SPI/GPIO imports and know no message semantics |
 | Physical receiver | `packet_predator/receiver.py` | Own the configured adapter's receive lifecycle, wait for frames independently of browsers, and hand opaque frames to the service |
 | Deployment profile | `packet_predator/nrf905_profile.py`, `config/` | Strictly validate local SPI, GPIO, and radio settings without making them shared protocol constants |
+| Pi service deployment | `packet_predator/systemd.py`, `packaging/`, `scripts/*systemd*` | Render and install one profile-explicit, loopback-only service as the ordinary Pi user |
 | Workbench service | `packet_predator/service.py` | Turn fixture, pasted, replay-delivered, or physically received bytes into inspectable observations |
 | Presentation model | `packet_predator/model.py` | Retain the newest 100 immutable observations, receiver state, monotonic revisions, and subscriber notifications |
 | Thin web layer | `packet_predator/web.py` | Own application lifespan, validate HTTP inputs, expose model snapshots/events, and serve static files |

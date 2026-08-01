@@ -1,0 +1,32 @@
+#!/usr/bin/env sh
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$repo_root"
+
+if [ "$#" -ne 1 ]; then
+    echo "usage: ./scripts/install-systemd-service NRF905_PROFILE" >&2
+    exit 2
+fi
+
+unit_name=suspicious-cellmates-packet-predator.service
+unit_path=/etc/systemd/system/$unit_name
+temporary_unit=$(mktemp --suffix=.service)
+trap 'rm -f "$temporary_unit"' EXIT HUP INT TERM
+
+echo "Running Packet Predator repository checks."
+./scripts/check
+
+./scripts/render-systemd-service "$1" > "$temporary_unit"
+
+echo "Validating the generated systemd unit."
+systemd-analyze verify "$temporary_unit"
+
+echo "Installing $unit_path (sudo is required)."
+sudo install -o root -g root -m 0644 "$temporary_unit" "$unit_path"
+sudo systemctl daemon-reload
+sudo systemctl enable --now "$unit_name"
+
+echo
+echo "Packet Predator boot service installed and started on Pi loopback."
+echo "Check it with: ./scripts/systemd-status"

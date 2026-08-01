@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+set -eu
+
+unit_name=suspicious-cellmates-packet-predator.service
+
+sudo systemctl --no-pager --full status "$unit_name"
+echo
+echo "Most recent service log:"
+sudo journalctl --no-pager -u "$unit_name" -n 30

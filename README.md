@@ -30,6 +30,12 @@ retention boundary, transmit safeguard, and common hardware failure.
 
 For the first physical bench, follow [nRF905 two-Raspberry-Pi validation](docs/nrf905-two-pi-bench.md). It documents the proven original-HAT pinout and required Pi 5 overlay, keeps all hardware and RF settings in a local profile, verifies the radio configuration by exact readback, and tests one known 32-byte frame in each direction. The default example profile cannot transmit. The [2026-07-24 validation result](docs/nrf905-validation-2026-07-24.md) also records the completed continuous-receive acceptance through the real Game Controller: Packet Predator captured the unspaced `HELLO_RESULT(CAPABILITIES_REQUIRED)` / `CAPABILITY_REQUEST` pair and supported the correlated capability transfer to `READY_FOR_SNAPSHOT` without adding transmitter spacing or retry behavior.
 
+For an already-proven Pi deployment, use the tracked
+[systemd installation procedure](docs/systemd-deployment.md) to start the
+physical workbench automatically on boot. The service remains bound to Pi
+loopback for the HVC-managed SSH tunnel; it does not use the unauthenticated
+`--lan` mode.
+
 Recording replay is explicit and non-reactive. The files contain a fixed timetable of released contract examples; they cannot branch, make a decision, create a response, or emulate a node. See [deterministic recordings](docs/deterministic-recordings.md) for the boundary and authoring rules.
 
 ## Historical prototype

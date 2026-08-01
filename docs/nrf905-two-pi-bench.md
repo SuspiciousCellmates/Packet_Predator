@@ -180,6 +180,10 @@ On either Pi, localhost remains the safe default:
 ./scripts/run-rpi config/nrf905-bench.local.json
 ```
 
+For a bench that has already passed its manual probe, the tracked
+[systemd deployment](systemd-deployment.md) can start this same loopback-only,
+profile-explicit command automatically at boot. Do not run both forms at once.
+
 From your normal computer, forward a local port through SSH:
 
 ```sh

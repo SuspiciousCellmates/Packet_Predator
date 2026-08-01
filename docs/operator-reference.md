@@ -45,6 +45,8 @@ in the local cached result. This metadata never enters the radio frame.
 | `./scripts/nrf905-diagnose --profile PROFILE receive ...` | Wait for and compare one expected released frame | Bounded by the supplied timeout |
 | `./scripts/nrf905-diagnose --profile PROFILE send ...` | Send one released fixture | Requires `transmit_enabled: true` |
 | `./scripts/update-rpi` | Fast-forward Protocol Contract and Packet Predator, refresh dependencies, run checks | Refuses dirty, detached, untracked, missing-upstream, or diverged repositories |
+| `./scripts/install-systemd-service PROFILE` | Install and start the permanent physical Pi service | Renders the real local paths and always binds through `run-rpi` without `--lan` |
+| `./scripts/systemd-status` | Show service state and its newest 30 journal lines | Observes the installed service without changing it |
 | `./scripts/check` | Run architecture/foundation guards and unit tests | Required before completion |
 
 Run `./scripts/nrf905-diagnose --help` and the subcommand help for the complete
@@ -82,6 +84,10 @@ In this example:
 
 A failure to connect to laptop port 8001 does not by itself mean the Pi
 service failed. Check the tunnel and the remote process separately.
+
+For unattended Pi startup, follow
+[`systemd-deployment.md`](systemd-deployment.md). Do not run a manual
+`run-rpi` process concurrently with the installed service.
 
 ## nRF905 profile
 

@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+"""Render the host-specific Packet Predator service to standard output."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+
+from packet_predator.systemd import (  # noqa: E402
+    SystemdServiceError,
+    current_account,
+    render_service,
+)
+
+
+def main() -> int:
+    if len(sys.argv) != 2:
+        print(
+            "usage: ./scripts/render-systemd-service NRF905_PROFILE",
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        user, group = current_account()
+        unit = render_service(
+            REPO_ROOT,
+            Path(sys.argv[1]),
+            user=user,
+            group=group,
+        )
+    except SystemdServiceError as exc:
+        print(f"{exc.code}: {exc.detail}", file=sys.stderr)
+        return 1
+    print(unit, end="")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
