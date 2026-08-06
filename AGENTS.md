@@ -75,3 +75,24 @@ Simulator actors or Controller policy to make an integration test convenient.
 ## Completion
 
 Run `./scripts/check` before reporting completion. Preserve the archived-runtime hashes and do not add an architecture exception merely to make a check pass. ADR 0005 and `.foundation/runtime-baseline.json` authorize the nRF905 validation boundary; changing that boundary requires another ADR.
+
+A gate may not skip silently: if a check cannot run, that is a failure, not a
+pass. See the gate-discipline convention at the top of `../.agents/WORKBOARD.txt`.
+
+## Where work is tracked
+
+Work lives in GitHub Issues in the repository that owns it, and every issue
+appears on the org board: <https://github.com/orgs/SuspiciousCellmates/projects>
+
+Look there before starting anything:
+
+    gh issue list -R SuspiciousCellmates/Packet_Predator
+    gh issue view <N> -R SuspiciousCellmates/Packet_Predator
+
+If you do work that is not on the board, file an issue for it. The board is
+only worth reading if it is complete.
+
+Issues track what is **to be done**. Durable decisions stay in ADRs, validation
+evidence stays with the component that produced it, and the standing
+conventions stay in `AGENTS.md` files like this one — none of those belong in
+an issue, because none of them ever close.
