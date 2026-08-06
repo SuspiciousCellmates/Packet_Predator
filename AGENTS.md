@@ -82,7 +82,7 @@ pass. See the gate-discipline convention at the top of `../.agents/WORKBOARD.txt
 ## Where work is tracked
 
 Work lives in GitHub Issues in the repository that owns it, and every issue
-appears on the org board: <https://github.com/orgs/SuspiciousCellmates/projects>
+appears on the org board: <https://github.com/orgs/SuspiciousCellmates/projects/2>
 
 Look there before starting anything:
 
