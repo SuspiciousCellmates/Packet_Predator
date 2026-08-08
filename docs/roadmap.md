@@ -38,6 +38,12 @@ The stable supporting deployment includes an optional host-rendered systemd
 unit for unattended Pi startup. It preserves the existing explicit-profile,
 loopback-only physical runtime rather than introducing a new product mode.
 
+One such concrete physical-validation need: a range-walk diagnostic
+(`walk-fixed`/`walk-carried` in `nrf905-diagnose`, see
+[nrf905-walk-test.md](nrf905-walk-test.md), issue #7) ported from
+`Player_Node_Firmware`'s ESP32 RF tool suite so the venue-range question can
+be answered on the already-validated Pi bench ahead of the badge fixture.
+
 ## Later considerations
 
 - Support later Game Controller and Game Master Console validation only through

@@ -4,15 +4,37 @@ from __future__ import annotations
 
 import argparse
 import json
+import signal
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any
 
-from .adapters.nrf905 import Nrf905Error
+from .adapters.nrf905 import Nrf905Device, Nrf905Error
+from .adapters.nrf905_linux import open_linux_backends
 from .nrf905_profile import Nrf905ProfileError, load_nrf905_profile
 from .nrf905_transport import open_nrf905_transport
+from .nrf905_walk import SysfsLed, run_carried_burst, run_fixed_loop
 from .wire_adapter import AuthorityError, InspectionError, WireAdapter
+
+_WALK_DUTY_CYCLE_WARNING = (
+    "WARNING: this transmits in short bursts every interval, well beyond the "
+    "one-shot exchange this profile's power and frequency were reviewed for. "
+    "Confirm your local 433 MHz duty-cycle allowance covers a station burst "
+    "(and, for walk-fixed, the whole walk) before proceeding.\n"
+)
+
+
+def _open_walk_device(profile) -> Nrf905Device:
+    spi, lines = open_linux_backends(profile)
+    device = Nrf905Device(profile, spi, lines)
+    try:
+        device.start()
+    except Exception:
+        device.close()
+        raise
+    return device
 
 
 def _print(value: dict[str, Any]) -> None:
@@ -38,6 +60,27 @@ def run(arguments: list[str] | None = None) -> int:
     receive = subparsers.add_parser("receive", help="Wait for one exact released 32-byte example")
     receive.add_argument("--expect-fixture", required=True, help="Released fixture id expected over the air")
     receive.add_argument("--timeout", type=float, default=30.0, help="Seconds to wait (default: 30)")
+
+    walk_fixed = subparsers.add_parser(
+        "walk-fixed", help="Run the long-lived base-station side of the range walk (Ctrl-C to stop)"
+    )
+    walk_fixed.add_argument("--interval-ms", type=float, default=100.0, help="Beacon interval in ms (default: 100)")
+    walk_fixed.add_argument(
+        "--status-every", type=int, default=50, help="Print a status line every N intervals (default: 50)"
+    )
+
+    walk_carried = subparsers.add_parser(
+        "walk-carried", help="Run one range-walk burst at the current station, then exit"
+    )
+    walk_carried.add_argument("--station", type=int, required=True, help="Station number, matched to your notebook")
+    walk_carried.add_argument("--slots", type=int, default=100, help="Beacons in this burst (default: 100)")
+    walk_carried.add_argument("--interval-ms", type=float, default=100.0, help="Beacon interval in ms (default: 100)")
+    walk_carried.add_argument(
+        "--led", required=True, help="LED name under /sys/class/leds, e.g. ACT (see `ls /sys/class/leds`)"
+    )
+    walk_carried.add_argument(
+        "--waypoints-file", type=Path, default=None, help="Append this burst's result to this file as one JSON line"
+    )
     args = parser.parse_args(arguments)
 
     transport = None
@@ -46,6 +89,46 @@ def run(arguments: list[str] | None = None) -> int:
         if args.command == "profile":
             _print({"ok": True, "stage": "profile", "profile": profile.public_summary()})
             return 0
+
+        if args.command in ("walk-fixed", "walk-carried"):
+            sys.stderr.write(_WALK_DUTY_CYCLE_WARNING)
+            device = _open_walk_device(profile)
+            try:
+                if args.command == "walk-fixed":
+                    def _status(iterations: int, received: int) -> None:
+                        if iterations % args.status_every == 0:
+                            _print({"ok": True, "stage": "walk-fixed", "iterations": iterations, "received": received})
+
+                    stop_event = threading.Event()
+                    previous_handler = signal.signal(signal.SIGINT, lambda *_: stop_event.set())
+                    try:
+                        received = run_fixed_loop(
+                            device,
+                            interval_s=args.interval_ms / 1000.0,
+                            stop=stop_event,
+                            on_status=_status,
+                        )
+                    finally:
+                        signal.signal(signal.SIGINT, previous_handler)
+                    _print({"ok": True, "stage": "walk-fixed", "stopped": True, "total_received": received})
+                    return 0
+
+                led = SysfsLed(args.led)
+                result = run_carried_burst(
+                    device,
+                    led,
+                    station=args.station,
+                    slots=args.slots,
+                    interval_s=args.interval_ms / 1000.0,
+                )
+                payload = {"ok": True, "stage": "walk-carried", "result": result.as_dict()}
+                _print(payload)
+                if args.waypoints_file is not None:
+                    with args.waypoints_file.open("a", encoding="utf-8") as handle:
+                        handle.write(json.dumps(result.as_dict(), sort_keys=True) + "\n")
+                return 0 if result.trustworthy else 2
+            finally:
+                device.close()
 
         wire = WireAdapter()
         transport = open_nrf905_transport(profile)

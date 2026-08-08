@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "original-packet-predator-hat-walk",
+  "adapter": "nrf905",
+  "spi": {
+    "device": "/dev/spidev0.0",
+    "speed_hz": 1000000
+  },
+  "gpio": {
+    "chip": "/dev/gpiochip0",
+    "pwr_up": 21,
+    "trx_ce": 7,
+    "tx_en": 23,
+    "carrier_detect": 18,
+    "address_match": 22,
+    "data_ready": 17
+  },
+  "radio": {
+    "band": 433,
+    "channel": 108,
+    "transmit_power_dbm": -10,
+    "receive_reduced_power": false,
+    "automatic_retransmit": false,
+    "address_hex": "5C3E91A4",
+    "crystal_mhz": 16,
+    "crc_bits": 16,
+    "transmit_enabled": false
+  }
+}
