@@ -8,6 +8,7 @@ import signal
 import sys
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +41,13 @@ def _open_walk_device(profile) -> Nrf905Device:
 
 def _print(value: dict[str, Any]) -> None:
     print(json.dumps(value, indent=2, sort_keys=True))
+
+
+def _timestamp() -> str:
+    # Only meaningful for correlating fixed/carried logs against each other
+    # if both Pis' clocks actually agree -- check `date` on both if the two
+    # logs' timestamps look offset from one another.
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def _fixed_example(wire: WireAdapter, identifier: str) -> tuple[bytes, dict[str, Any]]:
@@ -105,7 +113,15 @@ def run(arguments: list[str] | None = None) -> int:
                 if args.command == "walk-fixed":
                     def _status(iterations: int, received: int) -> None:
                         if iterations % args.status_every == 0:
-                            _print({"ok": True, "stage": "walk-fixed", "iterations": iterations, "received": received})
+                            _print(
+                                {
+                                    "ok": True,
+                                    "stage": "walk-fixed",
+                                    "timestamp": _timestamp(),
+                                    "iterations": iterations,
+                                    "received": received,
+                                }
+                            )
 
                     stop_event = threading.Event()
                     previous_handler = signal.signal(signal.SIGINT, lambda *_: stop_event.set())
@@ -118,16 +134,30 @@ def run(arguments: list[str] | None = None) -> int:
                         )
                     finally:
                         signal.signal(signal.SIGINT, previous_handler)
-                    _print({"ok": True, "stage": "walk-fixed", "stopped": True, "total_received": received})
+                    _print(
+                        {
+                            "ok": True,
+                            "stage": "walk-fixed",
+                            "timestamp": _timestamp(),
+                            "stopped": True,
+                            "total_received": received,
+                        }
+                    )
                     return 0
 
                 led = SysfsLed(args.led)
 
                 def _report(result) -> None:
-                    _print({"ok": True, "stage": "walk-carried", "result": result.as_dict()})
+                    payload = {
+                        "ok": True,
+                        "stage": "walk-carried",
+                        "timestamp": _timestamp(),
+                        "result": result.as_dict(),
+                    }
+                    _print(payload)
                     if args.waypoints_file is not None:
                         with args.waypoints_file.open("a", encoding="utf-8") as handle:
-                            handle.write(json.dumps(result.as_dict(), sort_keys=True) + "\n")
+                            handle.write(json.dumps(payload, sort_keys=True) + "\n")
 
                 if not args.continuous:
                     result = run_carried_burst(
@@ -154,7 +184,15 @@ def run(arguments: list[str] | None = None) -> int:
                     )
                 finally:
                     signal.signal(signal.SIGINT, previous_handler)
-                _print({"ok": True, "stage": "walk-carried", "stopped": True, "stations_run": len(results)})
+                _print(
+                    {
+                        "ok": True,
+                        "stage": "walk-carried",
+                        "timestamp": _timestamp(),
+                        "stopped": True,
+                        "stations_run": len(results),
+                    }
+                )
                 return 0
             finally:
                 device.close()

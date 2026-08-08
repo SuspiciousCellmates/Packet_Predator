@@ -87,7 +87,7 @@ Base station, started once, left running for the whole walk:
 ```
 
 Prints a status line periodically (`--status-every`, default every 50
-intervals) and a final total on Ctrl-C. Nothing else needs to happen here.
+intervals) and a final report on Ctrl-C. Nothing else needs to happen here.
 
 From the carried node, either one burst per station:
 
@@ -158,20 +158,27 @@ dependency on which one you use, only on `--led` naming a working
 
 ```json
 {
-  "station": 4,
-  "slots_run": 100,
-  "slots_void": 0,
-  "downlink_received": 93,
-  "downlink_span": 97,
-  "downlink_loss_percent": 4,
-  "longest_miss_run": 2,
-  "uplink_delivered": 91,
-  "uplink_denominator": 100,
-  "uplink_loss_percent": 9,
-  "carrier_busy_percent": 3,
-  "trustworthy": true
+  "ok": true,
+  "stage": "walk-carried",
+  "timestamp": "2026-08-08T05:14:22.101Z",
+  "result": {
+    "station": 4,
+    "slots_run": 100,
+    "slots_void": 0,
+    "downlink_received": 93,
+    "downlink_span": 97,
+    "downlink_loss_percent": 4,
+    "longest_miss_run": 2,
+    "uplink_delivered": 91,
+    "uplink_denominator": 100,
+    "uplink_loss_percent": 9,
+    "carrier_busy_percent": 3,
+    "trustworthy": true
+  }
 }
 ```
+
+`timestamp` is wall-clock UTC from whichever Pi produced that line -- useful for lining up a `walk-carried` waypoints file against a `walk-fixed` log side by side (or against your own notes of when you crossed a particular spot), but only if both Pis' clocks actually agree. Check `date` on both before trusting a close correlation between them; nothing here corrects for drift.
 
 - `downlink_*` is what the carried node measured of the fixed node's beacons:
   `downlink_span` is how many distinct fixed sequence numbers should exist
@@ -180,7 +187,14 @@ dependency on which one you use, only on `--led` naming a working
   consecutive gap, which is the number that decides playability -- a
   scattered 5% loss is survivable where 5% arriving as one run is not.
 - `uplink_*` is the fixed node's view of the carried node's beacons, recovered
-  as the delta of its self-reported total across this burst.
+  as the delta of its self-reported total across this burst. This can only be
+  sampled by piggyback on a downlink frame, so `uplink_loss_percent` reads `0`
+  (not a claimed `100`) whenever `downlink_received` is `0` -- the same
+  "unmeasured reads as zero, not worst-case" rule as `downlink_span`. Treat a
+  low but nonzero `downlink_received` (a handful of frames, not zero) as
+  making the uplink number noisier too, not just the downlink one: it can only
+  be sampled as often as a downlink frame happens to arrive, so a sparse burst
+  gives it fewer chances to catch the fixed node's counter moving.
 - `carrier_busy_percent` is occupancy, not signal strength -- the nRF905 has
   no RSSI register. High loss with low carrier-busy is out of range; high
   loss with high carrier-busy is contention.
