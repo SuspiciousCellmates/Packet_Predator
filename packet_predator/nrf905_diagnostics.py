@@ -16,7 +16,7 @@ from .adapters.nrf905 import Nrf905Device, Nrf905Error
 from .adapters.nrf905_linux import open_linux_backends
 from .nrf905_profile import Nrf905ProfileError, load_nrf905_profile
 from .nrf905_transport import open_nrf905_transport
-from .nrf905_walk import SysfsLed, run_carried_burst, run_carried_loop, run_fixed_loop
+from .nrf905_walk import FixedLoopResult, SysfsLed, run_carried_burst, run_carried_loop, run_fixed_loop
 from .wire_adapter import AuthorityError, InspectionError, WireAdapter
 
 _WALK_DUTY_CYCLE_WARNING = (
@@ -106,27 +106,48 @@ def run(arguments: list[str] | None = None) -> int:
             _print({"ok": True, "stage": "profile", "profile": profile.public_summary()})
             return 0
 
+        if args.command == "walk-fixed" and not profile.radio.transmit_enabled:
+            # walk-fixed's only job is to beacon every interval. A disabled
+            # transmitter fails every single one of those deterministically,
+            # not occasionally -- catch it before touching hardware rather
+            # than letting the loop run all night discovering it one silent
+            # transmit failure at a time.
+            raise Nrf905Error(
+                "NRF905_TRANSMIT_DISABLED",
+                "walk-fixed beacons every interval; this profile has radio.transmit_enabled=false, "
+                "so every beacon would silently fail to send. Review the bench frequency and duty-cycle "
+                "allowance, then set transmit_enabled to true.",
+            )
+
         if args.command in ("walk-fixed", "walk-carried"):
             sys.stderr.write(_WALK_DUTY_CYCLE_WARNING)
             device = _open_walk_device(profile)
             try:
                 if args.command == "walk-fixed":
-                    def _status(iterations: int, received: int) -> None:
+                    def _status(iterations: int, received: int, transmit_void: int) -> None:
                         if iterations % args.status_every == 0:
+                            # Same trustworthy policy as the final report, applied to
+                            # the running snapshot -- a status line must not claim ok
+                            # while transmit is already past the void threshold.
+                            running = FixedLoopResult(
+                                iterations=iterations, received=received, transmit_void=transmit_void
+                            )
                             _print(
                                 {
-                                    "ok": True,
+                                    "ok": running.trustworthy,
                                     "stage": "walk-fixed",
                                     "timestamp": _timestamp(),
                                     "iterations": iterations,
                                     "received": received,
+                                    "transmit_void": transmit_void,
+                                    "trustworthy": running.trustworthy,
                                 }
                             )
 
                     stop_event = threading.Event()
                     previous_handler = signal.signal(signal.SIGINT, lambda *_: stop_event.set())
                     try:
-                        received = run_fixed_loop(
+                        result = run_fixed_loop(
                             device,
                             interval_s=args.interval_ms / 1000.0,
                             stop=stop_event,
@@ -136,14 +157,17 @@ def run(arguments: list[str] | None = None) -> int:
                         signal.signal(signal.SIGINT, previous_handler)
                     _print(
                         {
-                            "ok": True,
+                            "ok": result.trustworthy,
                             "stage": "walk-fixed",
                             "timestamp": _timestamp(),
                             "stopped": True,
-                            "total_received": received,
+                            "iterations": result.iterations,
+                            "total_received": result.received,
+                            "transmit_void": result.transmit_void,
+                            "trustworthy": result.trustworthy,
                         }
                     )
-                    return 0
+                    return 0 if result.trustworthy else 2
 
                 led = SysfsLed(args.led)
 

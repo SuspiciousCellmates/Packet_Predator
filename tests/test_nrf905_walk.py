@@ -41,11 +41,13 @@ class FakeWalkDevice:
     until-timeout wait would cost, without spending any wall-clock time on it.
     """
 
-    def __init__(self, clock, fail_transmit_slots=frozenset()):
+    def __init__(self, clock, fail_transmit_slots=frozenset(), fail_carrier_slots=frozenset()):
         self._clock = clock
         self._pending = deque()
         self.fail_transmit_slots = fail_transmit_slots
+        self.fail_carrier_slots = fail_carrier_slots
         self.transmitted = []
+        self._carrier_reads = 0
 
     def queue(self, frame):
         self._pending.append(frame)
@@ -58,6 +60,10 @@ class FakeWalkDevice:
         return {"elapsed_ms": 0.0, "frame_hex": frame.hex()}
 
     def pin_status(self):
+        index = self._carrier_reads
+        self._carrier_reads += 1
+        if index in self.fail_carrier_slots:
+            raise Nrf905Error("NRF905_GPIO_READ", "simulated carrier-detect read failure")
         return {"carrier_detect": False}
 
     def wait_data_ready(self, timeout_s):
@@ -154,34 +160,73 @@ class BurstResultTests(unittest.TestCase):
         result = BurstResult(
             station=1, slots_run=0, slots_void=0, downlink_received=0, downlink_span=0,
             longest_miss_run=0, uplink_delivered=0, uplink_denominator=0,
-            carrier_samples=0, carrier_busy=0,
+            carrier_samples=0, carrier_busy=0, carrier_void=0,
         )
         self.assertEqual(result.downlink_loss_percent, 0)
         self.assertEqual(result.uplink_loss_percent, 0)
         self.assertFalse(result.trustworthy)
+
+    def test_uplink_loss_is_zero_not_100_when_nothing_was_heard_from_fixed(self):
+        # Uplink can only be sampled via the fixed node's piggybacked counter,
+        # which requires hearing at least one downlink frame. Zero downlink
+        # reception with a healthy denominator used to compute a false 100%
+        # here -- indistinguishable from "we heard fixed, but it heard none
+        # of us" -- when the truth is we have no basis for a number at all.
+        result = BurstResult(
+            station=1, slots_run=100, slots_void=0, downlink_received=0, downlink_span=0,
+            longest_miss_run=0, uplink_delivered=0, uplink_denominator=100,
+            carrier_samples=0, carrier_busy=0, carrier_void=0,
+        )
+        self.assertEqual(result.uplink_loss_percent, 0)
 
     def test_uplink_delivered_beyond_denominator_is_clamped(self):
         # A stale delta (e.g. a wrapped 16-bit counter) must not report negative loss.
         result = BurstResult(
             station=1, slots_run=10, slots_void=0, downlink_received=0, downlink_span=0,
             longest_miss_run=0, uplink_delivered=999, uplink_denominator=10,
-            carrier_samples=0, carrier_busy=0,
+            carrier_samples=0, carrier_busy=0, carrier_void=0,
         )
         self.assertEqual(result.uplink_loss_percent, 0)
 
     def test_trustworthy_threshold_is_25_percent_void(self):
+        # carrier_samples is healthy and identical in both cases, so this
+        # isolates the slots_void threshold from the carrier-availability
+        # gate covered separately below.
         trustworthy = BurstResult(
             station=1, slots_run=5, slots_void=1, downlink_received=0, downlink_span=0,
             longest_miss_run=0, uplink_delivered=0, uplink_denominator=4,
-            carrier_samples=0, carrier_busy=0,
+            carrier_samples=5, carrier_busy=0, carrier_void=0,
         )
         untrustworthy = BurstResult(
             station=1, slots_run=5, slots_void=2, downlink_received=0, downlink_span=0,
             longest_miss_run=0, uplink_delivered=0, uplink_denominator=3,
-            carrier_samples=0, carrier_busy=0,
+            carrier_samples=5, carrier_busy=0, carrier_void=0,
         )
         self.assertTrue(trustworthy.trustworthy)
         self.assertFalse(untrustworthy.trustworthy)
+
+    def test_carrier_busy_percent_is_none_not_zero_when_every_sample_failed(self):
+        # None is "no reading," distinct from 0, which is "confirmed clear."
+        # Collapsing them would let a dead carrier-detect line report a clean
+        # channel.
+        result = BurstResult(
+            station=1, slots_run=5, slots_void=0, downlink_received=0, downlink_span=0,
+            longest_miss_run=0, uplink_delivered=0, uplink_denominator=5,
+            carrier_samples=0, carrier_busy=0, carrier_void=5,
+        )
+        self.assertIsNone(result.carrier_busy_percent)
+        self.assertFalse(result.trustworthy)
+
+    def test_trustworthy_despite_partial_carrier_sampling_failure(self):
+        # A handful of successful reads is still a basis for a percentage,
+        # just a noisier one -- only total failure withholds trustworthy.
+        result = BurstResult(
+            station=1, slots_run=5, slots_void=0, downlink_received=0, downlink_span=0,
+            longest_miss_run=0, uplink_delivered=0, uplink_denominator=5,
+            carrier_samples=1, carrier_busy=0, carrier_void=4,
+        )
+        self.assertEqual(result.carrier_busy_percent, 0)
+        self.assertTrue(result.trustworthy)
 
 
 class SysfsLedTests(unittest.TestCase):
@@ -246,6 +291,40 @@ class RunCarriedBurstTests(unittest.TestCase):
         self.assertEqual(led.blinks, 2)
         self.assertTrue(result.trustworthy)
 
+    def test_total_carrier_sampling_failure_is_not_confirmed_zero_busy(self):
+        clock = ManualClock()
+        device = FakeWalkDevice(clock, fail_carrier_slots={0, 1, 2, 3, 4})
+        led = FakeLed()
+
+        result = run_carried_burst(
+            device, led, station=1, slots=5, interval_s=0.01,
+            sleeper=clock.sleep, monotonic=clock,
+        )
+
+        self.assertEqual(result.slots_run, 5)
+        self.assertEqual(result.slots_void, 0)
+        self.assertEqual(result.carrier_samples, 0)
+        self.assertIsNone(result.carrier_busy_percent)
+        self.assertIsNone(result.as_dict()["carrier_busy_percent"])
+        # Clean transmit/receive but zero carrier evidence still voids trust
+        # in the result -- this is exactly the case that used to serialize
+        # as a confirmed 0% busy reading.
+        self.assertFalse(result.trustworthy)
+
+    def test_partial_carrier_sampling_failure_still_reports_a_percentage(self):
+        clock = ManualClock()
+        device = FakeWalkDevice(clock, fail_carrier_slots={0, 1, 2, 3})
+        led = FakeLed()
+
+        result = run_carried_burst(
+            device, led, station=1, slots=5, interval_s=0.01,
+            sleeper=clock.sleep, monotonic=clock,
+        )
+
+        self.assertEqual(result.carrier_samples, 1)
+        self.assertEqual(result.carrier_busy_percent, 0)
+        self.assertTrue(result.trustworthy)
+
     def test_no_reception_yields_zero_span_not_100_percent_loss(self):
         # With nothing received there is no denominator (we never learned how
         # many beacons the fixed node even sent), so this reads as 0% loss on
@@ -264,6 +343,10 @@ class RunCarriedBurstTests(unittest.TestCase):
         self.assertEqual(result.downlink_span, 0)
         self.assertEqual(result.downlink_loss_percent, 0)
         self.assertEqual(result.uplink_delivered, 0)
+        # Not 100: we never sampled the fixed node's counter at all, so there
+        # is no basis to claim any uplink loss either -- same "unmeasured
+        # reads as 0" convention as downlink, for the same reason.
+        self.assertEqual(result.uplink_loss_percent, 0)
         self.assertTrue(result.trustworthy)
         # Nothing arrived, so the LED never lit -- this is the "out of range"
         # signal the walk relies on: it goes dark, not just imprecise.
@@ -316,12 +399,15 @@ class RunFixedLoopTests(unittest.TestCase):
         device.queue(carried_frame)
         device.queue(carried_frame)
 
-        received = run_fixed_loop(
+        result = run_fixed_loop(
             device, interval_s=0.01, max_iterations=3,
             sleeper=clock.sleep, monotonic=clock,
         )
 
-        self.assertEqual(received, 2)
+        self.assertEqual(result.iterations, 3)
+        self.assertEqual(result.received, 2)
+        self.assertEqual(result.transmit_void, 0)
+        self.assertTrue(result.trustworthy)
         self.assertEqual(len(device.transmitted), 3)
         reported_counts = [decode_walk_frame(frame).received_count for frame in device.transmitted]
         # The count reported in each outgoing beacon reflects what had been
@@ -335,10 +421,59 @@ class RunFixedLoopTests(unittest.TestCase):
         stop = threading.Event()
         stop.set()
 
-        received = run_fixed_loop(device, interval_s=0.01, stop=stop, sleeper=clock.sleep, monotonic=clock)
+        result = run_fixed_loop(device, interval_s=0.01, stop=stop, sleeper=clock.sleep, monotonic=clock)
 
-        self.assertEqual(received, 0)
+        self.assertEqual(result.iterations, 0)
+        self.assertEqual(result.received, 0)
         self.assertEqual(len(device.transmitted), 0)
+        self.assertFalse(result.trustworthy)
+
+    def test_a_transmit_failure_does_not_stop_the_loop_but_is_counted_void(self):
+        # Whether it's a one-off hardware fault or radio.transmit_enabled set
+        # to false (which fails every single call, deterministically), the
+        # fixed node must keep listening regardless -- but the failure must
+        # not vanish silently.
+        clock = ManualClock()
+        device = FakeWalkDevice(clock, fail_transmit_slots={0, 1, 2})
+
+        result = run_fixed_loop(
+            device, interval_s=0.01, max_iterations=3,
+            sleeper=clock.sleep, monotonic=clock,
+        )
+
+        self.assertEqual(result.iterations, 3)
+        self.assertEqual(result.transmit_void, 3)
+        self.assertEqual(len(device.transmitted), 3)
+        # Every one of 3 iterations failed to transmit -- well past the 25%
+        # void threshold, so the run cannot claim to have beaconed.
+        self.assertFalse(result.trustworthy)
+
+    def test_occasional_transmit_failure_stays_trustworthy(self):
+        clock = ManualClock()
+        device = FakeWalkDevice(clock, fail_transmit_slots={0})
+
+        result = run_fixed_loop(
+            device, interval_s=0.01, max_iterations=5,
+            sleeper=clock.sleep, monotonic=clock,
+        )
+
+        self.assertEqual(result.transmit_void, 1)
+        self.assertTrue(result.trustworthy)
+
+    def test_status_callback_receives_the_running_void_count(self):
+        clock = ManualClock()
+        device = FakeWalkDevice(clock, fail_transmit_slots={0, 1})
+        statuses = []
+
+        run_fixed_loop(
+            device, interval_s=0.01, max_iterations=3,
+            on_status=lambda iterations, received, transmit_void: statuses.append(
+                (iterations, received, transmit_void)
+            ),
+            sleeper=clock.sleep, monotonic=clock,
+        )
+
+        self.assertEqual(statuses, [(1, 0, 1), (2, 0, 2), (3, 0, 2)])
 
 
 if __name__ == "__main__":

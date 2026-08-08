@@ -154,6 +154,7 @@ class BurstResult:
     uplink_denominator: int
     carrier_samples: int
     carrier_busy: int
+    carrier_void: int
 
     @property
     def downlink_loss_percent(self) -> int:
@@ -163,21 +164,43 @@ class BurstResult:
 
     @property
     def uplink_loss_percent(self) -> int:
-        if self.uplink_denominator <= 0:
+        # Uplink is only ever known via the fixed node's piggybacked counter,
+        # which we can only sample when a downlink frame actually arrives.
+        # With zero downlink reception we never sampled it even once, so
+        # there is no basis for a number -- same reasoning as downlink_span
+        # being 0, and the same fix: report unmeasured as 0, not the worst
+        # case. Without this, a station with no signal in either direction
+        # reads as "0% downlink loss, 100% uplink loss", which looks like an
+        # asymmetric link rather than what it actually is: no link at all.
+        if self.uplink_denominator <= 0 or self.downlink_received == 0:
             return 0
         delivered = max(0, min(self.uplink_delivered, self.uplink_denominator))
         return percent_of(self.uplink_denominator - delivered, self.uplink_denominator)
 
     @property
-    def carrier_busy_percent(self) -> int:
+    def carrier_busy_percent(self) -> Optional[int]:
+        # None, not 0, when every carrier read failed: 0 means "confirmed
+        # clear," and a GPIO line that never once answered has confirmed
+        # nothing. Collapsing the two would let a dead carrier-detect read
+        # serialize as a clean channel -- the same silent-skip failure this
+        # project's gate-discipline rule exists to catch.
+        if self.carrier_samples == 0:
+            return None
         return percent_of(self.carrier_busy, self.carrier_samples)
 
     @property
     def trustworthy(self) -> bool:
         # Same threshold as the ESP32 tool: a burst dominated by local faults
         # is not a measurement, and the miss-run figure in particular is only
-        # meaningful across slots we actually learned something from.
-        return self.slots_run != 0 and self.slots_void * 4 < self.slots_run
+        # meaningful across slots we actually learned something from. Total
+        # carrier-sampling failure is its own local fault, independent of
+        # slots_void: a burst can transmit and receive cleanly while the
+        # carrier-detect line never once answers.
+        return (
+            self.slots_run != 0
+            and self.slots_void * 4 < self.slots_run
+            and self.carrier_samples > 0
+        )
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -191,6 +214,8 @@ class BurstResult:
             "uplink_delivered": max(0, self.uplink_delivered),
             "uplink_denominator": self.uplink_denominator,
             "uplink_loss_percent": self.uplink_loss_percent,
+            "carrier_samples": self.carrier_samples,
+            "carrier_void": self.carrier_void,
             "carrier_busy_percent": self.carrier_busy_percent,
             "trustworthy": self.trustworthy,
         }
@@ -270,6 +295,7 @@ def run_carried_burst(
     slots_void = 0
     carrier_samples = 0
     carrier_busy = 0
+    carrier_void = 0
     own_sequence = 0
 
     for _ in range(slots):
@@ -294,7 +320,7 @@ def run_carried_burst(
         try:
             busy = device.pin_status()["carrier_detect"]
         except Nrf905Error:
-            pass
+            carrier_void += 1
         else:
             carrier_samples += 1
             if busy:
@@ -336,6 +362,7 @@ def run_carried_burst(
         uplink_denominator=slots_run - slots_void,
         carrier_samples=carrier_samples,
         carrier_busy=carrier_busy,
+        carrier_void=carrier_void,
     )
 
 
@@ -379,29 +406,51 @@ def run_carried_loop(
     return results
 
 
+@dataclass(frozen=True)
+class FixedLoopResult:
+    iterations: int
+    received: int
+    transmit_void: int
+
+    @property
+    def trustworthy(self) -> bool:
+        # Same policy as BurstResult.trustworthy, applied to the whole run
+        # instead of one station's burst: an occasional local fault does not
+        # invalidate a multi-hour walk, but a base station that never
+        # actually transmits (disabled radio.transmit_enabled, a jammed
+        # antenna, ...) must not report as if it beaconed the whole time.
+        return self.iterations != 0 and self.transmit_void * 4 < self.iterations
+
+
 def run_fixed_loop(
     device: Nrf905Device,
     interval_s: float = 0.100,
     stop: Optional[threading.Event] = None,
     max_iterations: Optional[int] = None,
-    on_status: Optional[Callable[[int, int], None]] = None,
+    on_status: Optional[Callable[[int, int, int], None]] = None,
     sleeper: Callable[[float], None] = time.sleep,
     monotonic: Callable[[], float] = time.monotonic,
-) -> int:
+) -> FixedLoopResult:
     """Beacon and count, forever, from the base station. Start this once.
 
-    The returned/reported count is a plain running total of valid Carried
-    beacons received -- incremented once per frame, never reset, never
-    deduplicated by sequence. It is deliberately not station-scoped: a
+    The returned/reported received count is a plain running total of valid
+    Carried beacons received -- incremented once per frame, never reset,
+    never deduplicated by sequence. It is deliberately not station-scoped: a
     carried node's burst recovers "how many of my beacons arrived here" as
     the delta of this value across its own window, which is well-defined no
     matter how many stations came before or how long this has been running.
+
+    A beacon transmit failure never stops the loop -- the fixed node must
+    keep listening and keep trying regardless -- but it is counted in
+    transmit_void so the result can say whether it actually beaconed rather
+    than just sitting there silently not doing so.
     """
 
     stop = stop if stop is not None else threading.Event()
     received = 0
     own_sequence = 0
     iterations = 0
+    transmit_void = 0
     while not stop.is_set():
         if max_iterations is not None and iterations >= max_iterations:
             break
@@ -418,7 +467,7 @@ def run_fixed_loop(
             )
             own_sequence = (own_sequence + 1) % 0x10000
         except Nrf905Error:
-            pass
+            transmit_void += 1
 
         deadline = slot_start + interval_s
         while True:
@@ -435,6 +484,6 @@ def run_fixed_loop(
                 received += 1
 
         if on_status is not None:
-            on_status(iterations, received)
+            on_status(iterations, received, transmit_void)
 
-    return received
+    return FixedLoopResult(iterations=iterations, received=received, transmit_void=transmit_void)

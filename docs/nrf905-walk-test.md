@@ -89,6 +89,18 @@ Base station, started once, left running for the whole walk:
 Prints a status line periodically (`--status-every`, default every 50
 intervals) and a final report on Ctrl-C. Nothing else needs to happen here.
 
+`walk-fixed` refuses to start at all against a profile with
+`radio.transmit_enabled: false` -- that setting fails every single beacon
+deterministically, so it is rejected up front rather than discovered an hour
+into a walk. Once running, every status line and the final report carry
+`transmit_void` (the running count of beacon transmits that failed against
+real hardware) and `trustworthy`, evaluated against that same running count
+each time -- so `ok` on a status line can flip to `false` mid-walk the moment
+void transmits cross the same 25%-of-run threshold `walk-carried` uses below,
+not only in the final report. The process exits `2` instead of `0` on Ctrl-C
+if it ends untrustworthy. A base station that isn't actually beaconing no
+longer reports success just because it kept listening.
+
 From the carried node, either one burst per station:
 
 ```sh
@@ -172,6 +184,8 @@ dependency on which one you use, only on `--led` naming a working
     "uplink_delivered": 91,
     "uplink_denominator": 100,
     "uplink_loss_percent": 9,
+    "carrier_samples": 97,
+    "carrier_void": 3,
     "carrier_busy_percent": 3,
     "trustworthy": true
   }
@@ -197,11 +211,17 @@ dependency on which one you use, only on `--led` naming a working
   gives it fewer chances to catch the fixed node's counter moving.
 - `carrier_busy_percent` is occupancy, not signal strength -- the nRF905 has
   no RSSI register. High loss with low carrier-busy is out of range; high
-  loss with high carrier-busy is contention.
-- `trustworthy` is about the instrument, not the link: it only reflects
-  whether too many local faults (`slots_void`) happened during the burst. A
-  burst with zero reception and zero faults is still `trustworthy` -- that is
-  a legitimately measured bad link, not a broken run.
+  loss with high carrier-busy is contention. `carrier_samples` and
+  `carrier_void` are how many of the burst's carrier-detect reads succeeded
+  and failed; if every single one failed, `carrier_busy_percent` reads
+  `null`, not `0` -- a `0` here is a confirmed clear reading, and a GPIO line
+  that never once answered has confirmed nothing.
+- `trustworthy` is about the instrument, not the link: it reflects whether
+  too many local faults (`slots_void`) happened during the burst, and whether
+  any carrier evidence was gathered at all (`carrier_samples > 0`). A burst
+  with zero reception and zero faults is still `trustworthy` -- that is a
+  legitimately measured bad link, not a broken run -- but total
+  carrier-sampling failure is not, even with clean transmit/receive.
 
 There is deliberately no pass/fail threshold here either, for the same reason
 `rf-tool-suite.md` gives: venue choice and Gateway placement get decided from
