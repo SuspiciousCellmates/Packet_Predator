@@ -44,6 +44,8 @@ in the local cached result. This metadata never enters the radio frame.
 | `./scripts/nrf905-diagnose --profile PROFILE probe` | Open hardware and verify exact nRF905 register readback | Does not itself send a protocol frame |
 | `./scripts/nrf905-diagnose --profile PROFILE receive ...` | Wait for and compare one expected released frame | Bounded by the supplied timeout |
 | `./scripts/nrf905-diagnose --profile PROFILE send ...` | Send one released fixture | Requires `transmit_enabled: true` |
+| `./scripts/nrf905-diagnose --profile PROFILE walk-fixed` | Long-running base-station side of the range walk | Ctrl-C to stop; requires `transmit_enabled: true` |
+| `./scripts/nrf905-diagnose --profile PROFILE walk-carried --station N --led NAME` | One range-walk burst at the current station | `--led` is required and fails loudly if it can't be driven; add `--continuous` to run consecutive bursts, auto-incrementing the station, until Ctrl-C; see [nrf905-walk-test.md](nrf905-walk-test.md) |
 | `./scripts/update-rpi` | Fast-forward Protocol Contract and Packet Predator, refresh dependencies, run checks | Refuses dirty, detached, untracked, missing-upstream, or diverged repositories |
 | `./scripts/install-systemd-service PROFILE` | Install and start the permanent physical Pi service | Renders the real local paths and always binds through `run-rpi` without `--lan` |
 | `./scripts/systemd-status` | Show service state and its newest 30 journal lines | Observes the installed service without changing it |

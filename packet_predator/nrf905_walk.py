@@ -256,8 +256,11 @@ def run_carried_burst(
 
     Each interval this node transmits its own beacon, then spends the rest of
     the interval listening for the fixed node's. The LED blinks once per
-    successful transmit of our own beacon -- the only continuous field signal
-    that the instrument itself is alive.
+    *received* downlink frame, not per transmit of our own -- our own transmit
+    succeeding is a local event that happens regardless of range, so it can't
+    tell you anything about the link. Gating the blink on reception instead
+    means walking out of range makes it visibly stop, and walking back makes
+    it visibly resume: "walk until it stops, walk back until it starts."
     """
 
     fixed_sequences: set[int] = set()
@@ -282,7 +285,6 @@ def run_carried_burst(
                 ).encode()
             )
             own_sequence = (own_sequence + 1) % 0x10000
-            led.blink(sleeper=sleeper)
         except Nrf905Error:
             slots_void += 1
 
@@ -311,6 +313,7 @@ def run_carried_burst(
             decoded = decode_walk_frame(frame)
             if decoded is None or decoded.role != ROLE_FIXED:
                 continue
+            led.blink(sleeper=sleeper)
             fixed_sequences.add(decoded.sequence)
             if first_fixed_count is None:
                 first_fixed_count = decoded.received_count
@@ -334,6 +337,46 @@ def run_carried_burst(
         carrier_samples=carrier_samples,
         carrier_busy=carrier_busy,
     )
+
+
+def run_carried_loop(
+    device: Nrf905Device,
+    led: SysfsLed,
+    start_station: int = 1,
+    slots: int = 100,
+    interval_s: float = 0.100,
+    stop: Optional[threading.Event] = None,
+    on_result: Optional[Callable[[BurstResult], None]] = None,
+    sleeper: Callable[[float], None] = time.sleep,
+    monotonic: Callable[[], float] = time.monotonic,
+) -> list[BurstResult]:
+    """Run consecutive bursts back to back, auto-incrementing the station
+    number, until stopped -- for walking continuously rather than re-invoking
+    the command by hand at every stop.
+
+    Each burst still measures and reports independently; this only removes
+    the need for a button or a fresh SSH session between stations. There is
+    still no way for the instrument to know where you physically were, so
+    note wall-clock time or the printed station number against your position
+    in your own notebook, same as ever.
+
+    A stop request is only checked between bursts, not mid-burst, so expect
+    up to one burst's length of delay after asking this to stop.
+    """
+
+    stop = stop if stop is not None else threading.Event()
+    station = start_station
+    results: list[BurstResult] = []
+    while not stop.is_set():
+        result = run_carried_burst(
+            device, led, station=station, slots=slots, interval_s=interval_s,
+            sleeper=sleeper, monotonic=monotonic,
+        )
+        results.append(result)
+        if on_result is not None:
+            on_result(result)
+        station = (station + 1) % 0x10000
+    return results
 
 
 def run_fixed_loop(

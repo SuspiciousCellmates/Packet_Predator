@@ -14,6 +14,7 @@ from packet_predator.nrf905_walk import (
     decode_walk_frame,
     percent_of,
     run_carried_burst,
+    run_carried_loop,
     run_fixed_loop,
 )
 
@@ -217,15 +218,19 @@ class RunCarriedBurstTests(unittest.TestCase):
         self.assertEqual(result.uplink_denominator, 5)
         self.assertEqual(result.uplink_loss_percent, 40)
         self.assertTrue(result.trustworthy)
-        self.assertEqual(led.blinks, 5)
+        # The LED tracks received downlink frames, not our own transmits --
+        # 4 distinct sequences arrived, so 4 blinks, not 5 (our slot count).
+        self.assertEqual(led.blinks, 4)
         self.assertEqual(len(device.transmitted), 5)
         first_sent = decode_walk_frame(device.transmitted[0])
         self.assertEqual(first_sent.role, ROLE_CARRIED)
         self.assertEqual(first_sent.station, 7)
 
-    def test_a_failed_transmit_is_void_not_lost_and_does_not_blink(self):
+    def test_a_failed_transmit_is_void_not_lost_and_blinking_is_independent_of_it(self):
         clock = ManualClock()
         device = FakeWalkDevice(clock, fail_transmit_slots={2})
+        device.queue(self._fixed_frame(1, 5))
+        device.queue(self._fixed_frame(2, 6))
         led = FakeLed()
 
         result = run_carried_burst(
@@ -236,7 +241,9 @@ class RunCarriedBurstTests(unittest.TestCase):
         self.assertEqual(result.slots_run, 5)
         self.assertEqual(result.slots_void, 1)
         self.assertEqual(result.uplink_denominator, 4)
-        self.assertEqual(led.blinks, 4)
+        # Reception, not our own transmit success, drives the blink -- these
+        # two receptions blink regardless of the unrelated transmit failure.
+        self.assertEqual(led.blinks, 2)
         self.assertTrue(result.trustworthy)
 
     def test_no_reception_yields_zero_span_not_100_percent_loss(self):
@@ -258,6 +265,46 @@ class RunCarriedBurstTests(unittest.TestCase):
         self.assertEqual(result.downlink_loss_percent, 0)
         self.assertEqual(result.uplink_delivered, 0)
         self.assertTrue(result.trustworthy)
+        # Nothing arrived, so the LED never lit -- this is the "out of range"
+        # signal the walk relies on: it goes dark, not just imprecise.
+        self.assertEqual(led.blinks, 0)
+
+
+class RunCarriedLoopTests(unittest.TestCase):
+    def test_auto_increments_station_and_stops_on_request(self):
+        clock = ManualClock()
+        device = FakeWalkDevice(clock)
+        led = FakeLed()
+        stop = threading.Event()
+        seen_stations = []
+
+        def on_result(result):
+            seen_stations.append(result.station)
+            if len(seen_stations) == 3:
+                stop.set()
+
+        results = run_carried_loop(
+            device, led, start_station=5, slots=2, interval_s=0.01,
+            stop=stop, on_result=on_result, sleeper=clock.sleep, monotonic=clock,
+        )
+
+        self.assertEqual([result.station for result in results], [5, 6, 7])
+        self.assertEqual(seen_stations, [5, 6, 7])
+
+    def test_an_already_set_stop_runs_nothing(self):
+        clock = ManualClock()
+        device = FakeWalkDevice(clock)
+        led = FakeLed()
+        stop = threading.Event()
+        stop.set()
+
+        results = run_carried_loop(
+            device, led, start_station=1, slots=2, interval_s=0.01,
+            stop=stop, sleeper=clock.sleep, monotonic=clock,
+        )
+
+        self.assertEqual(results, [])
+        self.assertEqual(len(device.transmitted), 0)
 
 
 class RunFixedLoopTests(unittest.TestCase):

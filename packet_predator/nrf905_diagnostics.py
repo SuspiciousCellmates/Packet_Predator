@@ -15,14 +15,15 @@ from .adapters.nrf905 import Nrf905Device, Nrf905Error
 from .adapters.nrf905_linux import open_linux_backends
 from .nrf905_profile import Nrf905ProfileError, load_nrf905_profile
 from .nrf905_transport import open_nrf905_transport
-from .nrf905_walk import SysfsLed, run_carried_burst, run_fixed_loop
+from .nrf905_walk import SysfsLed, run_carried_burst, run_carried_loop, run_fixed_loop
 from .wire_adapter import AuthorityError, InspectionError, WireAdapter
 
 _WALK_DUTY_CYCLE_WARNING = (
     "WARNING: this transmits in short bursts every interval, well beyond the "
     "one-shot exchange this profile's power and frequency were reviewed for. "
-    "Confirm your local 433 MHz duty-cycle allowance covers a station burst "
-    "(and, for walk-fixed, the whole walk) before proceeding.\n"
+    "walk-fixed and --continuous walk-carried run this way for the whole "
+    "walk, not just one burst. Confirm your local 433 MHz duty-cycle "
+    "allowance covers that before proceeding.\n"
 )
 
 
@@ -72,14 +73,21 @@ def run(arguments: list[str] | None = None) -> int:
     walk_carried = subparsers.add_parser(
         "walk-carried", help="Run one range-walk burst at the current station, then exit"
     )
-    walk_carried.add_argument("--station", type=int, required=True, help="Station number, matched to your notebook")
+    walk_carried.add_argument(
+        "--station", type=int, required=True,
+        help="Station number; the starting number if --continuous is given",
+    )
     walk_carried.add_argument("--slots", type=int, default=100, help="Beacons in this burst (default: 100)")
     walk_carried.add_argument("--interval-ms", type=float, default=100.0, help="Beacon interval in ms (default: 100)")
     walk_carried.add_argument(
         "--led", required=True, help="LED name under /sys/class/leds, e.g. ACT (see `ls /sys/class/leds`)"
     )
     walk_carried.add_argument(
-        "--waypoints-file", type=Path, default=None, help="Append this burst's result to this file as one JSON line"
+        "--waypoints-file", type=Path, default=None, help="Append each burst's result to this file as one JSON line"
+    )
+    walk_carried.add_argument(
+        "--continuous", action="store_true",
+        help="Run consecutive bursts back to back, auto-incrementing --station, until Ctrl-C",
     )
     args = parser.parse_args(arguments)
 
@@ -114,19 +122,40 @@ def run(arguments: list[str] | None = None) -> int:
                     return 0
 
                 led = SysfsLed(args.led)
-                result = run_carried_burst(
-                    device,
-                    led,
-                    station=args.station,
-                    slots=args.slots,
-                    interval_s=args.interval_ms / 1000.0,
-                )
-                payload = {"ok": True, "stage": "walk-carried", "result": result.as_dict()}
-                _print(payload)
-                if args.waypoints_file is not None:
-                    with args.waypoints_file.open("a", encoding="utf-8") as handle:
-                        handle.write(json.dumps(result.as_dict(), sort_keys=True) + "\n")
-                return 0 if result.trustworthy else 2
+
+                def _report(result) -> None:
+                    _print({"ok": True, "stage": "walk-carried", "result": result.as_dict()})
+                    if args.waypoints_file is not None:
+                        with args.waypoints_file.open("a", encoding="utf-8") as handle:
+                            handle.write(json.dumps(result.as_dict(), sort_keys=True) + "\n")
+
+                if not args.continuous:
+                    result = run_carried_burst(
+                        device,
+                        led,
+                        station=args.station,
+                        slots=args.slots,
+                        interval_s=args.interval_ms / 1000.0,
+                    )
+                    _report(result)
+                    return 0 if result.trustworthy else 2
+
+                stop_event = threading.Event()
+                previous_handler = signal.signal(signal.SIGINT, lambda *_: stop_event.set())
+                try:
+                    results = run_carried_loop(
+                        device,
+                        led,
+                        start_station=args.station,
+                        slots=args.slots,
+                        interval_s=args.interval_ms / 1000.0,
+                        stop=stop_event,
+                        on_result=_report,
+                    )
+                finally:
+                    signal.signal(signal.SIGINT, previous_handler)
+                _print({"ok": True, "stage": "walk-carried", "stopped": True, "stations_run": len(results)})
+                return 0
             finally:
                 device.close()
 

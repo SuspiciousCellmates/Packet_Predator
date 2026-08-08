@@ -54,13 +54,14 @@ what actually tells you "nothing arrived" -- not the loss percentage.
 
 ## Before transmitting
 
-- **Duty cycle.** This holds the radio in short bursts every interval,
-  continuously for `walk-fixed` and for ten seconds per station for
-  `walk-carried` at the defaults (100 slots x 100 ms). That is well beyond
-  the one-shot exchange `transmit_enabled` was originally reviewed for.
-  Re-review your local 433 MHz duty-cycle allowance against a whole walk, not
-  just one exchange, before setting it to `true`. The CLI prints a reminder
-  every run; it cannot check this for you.
+- **Duty cycle.** This holds the radio in short bursts every interval --
+  continuously, for the whole walk, if you run `walk-fixed` or
+  `walk-carried --continuous` (see below), and for ten seconds per station
+  otherwise (100 slots x 100 ms at the defaults). That is well beyond the
+  one-shot exchange `transmit_enabled` was originally reviewed for. Re-review
+  your local 433 MHz duty-cycle allowance against a whole walk, not just one
+  exchange, before setting it to `true`. The CLI prints a reminder every run;
+  it cannot check this for you.
 - **Fit the antenna first.**
 - **Use a profile with its own address.** `config/nrf905-walk.example.json`
   ships a distinct `radio.address_hex` from the bench example
@@ -88,19 +89,34 @@ Base station, started once, left running for the whole walk:
 Prints a status line periodically (`--status-every`, default every 50
 intervals) and a final total on Ctrl-C. Nothing else needs to happen here.
 
-At each station, from the carried node:
+From the carried node, either one burst per station:
 
 ```sh
 ./scripts/nrf905-diagnose --profile config/nrf905-walk.local.json \
   walk-carried --station 4 --led ACT --waypoints-file walk-2026-08-08.jsonl
 ```
 
-Runs one ten-second burst (100 slots at the 100 ms default), prints the
-result as JSON, and appends the same JSON as one line to the waypoints file
-if given. Exit status is `0` if the burst was trustworthy (fewer than 25% of
-slots void from local faults) and `2` otherwise -- the same threshold the
-ESP32 tool uses, so a script driving several stations can tell a bad reading
-from a bad connection.
+which runs one ten-second burst (100 slots at the 100 ms default), prints the
+result as JSON, appends the same JSON as one line to the waypoints file if
+given, and exits -- you'd re-run this by hand at every stop, bumping
+`--station` each time; or, to actually walk continuously without stopping to
+re-run anything:
+
+```sh
+./scripts/nrf905-diagnose --profile config/nrf905-walk.local.json \
+  walk-carried --continuous --station 1 --led ACT --waypoints-file walk-2026-08-08.jsonl
+```
+
+which runs consecutive bursts back to back, printing and logging each as it
+completes and auto-incrementing the station number, until Ctrl-C (which takes
+effect at the next burst boundary, so allow up to one burst's length to
+actually stop). `--station` is just the *starting* number in this mode.
+Nothing here knows your physical position either way -- note wall-clock time
+or the printed station number against where you were, in your own notebook.
+
+Single-burst exit status is `0` if trustworthy (fewer than 25% of slots void
+from local faults) and `2` otherwise, the same threshold the ESP32 tool uses;
+`--continuous` just exits `0` on a clean Ctrl-C.
 
 `--led` is required and hard-fails if it can't be driven -- see below. This
 is the only continuous field feedback the carried node has; walking untethered
@@ -120,9 +136,17 @@ Pick the name that lights when you touch it (commonly `ACT` on a Zero 2 W;
 `ACT` or `PWR` on a Pi 5, depending on OS version -- the Pi 5's is driven
 through the RP1 companion chip rather than a raw SoC pin, so treat "it
 behaves the same at the sysfs layer" as expected, not confirmed, until you've
-watched it blink). `walk-carried` blinks it once per successfully transmitted
-beacon of its own; a failed transmit does not blink, so a dark carried node
-mid-walk means the instrument itself has stopped, not that the link is bad.
+watched it blink).
+
+**It blinks once per received downlink frame, not per transmit of our own.**
+Our own transmit succeeding is a purely local event and happens regardless of
+range, so it can't tell you anything about the link; gating the blink on
+actually hearing the fixed node instead means walking out of range makes it
+visibly stop, and walking back makes it visibly resume -- walk until it
+stops, walk back until it starts, exactly as the original brief wanted. A
+dark carried node mid-walk now means either out of range or the instrument
+has stopped; there's no way to tell those apart from the LED alone, only from
+whether it resumes when you walk back.
 
 If the onboard LED turns out to be inconvenient or ambiguous on a given
 board, an external LED and resistor on a spare GPIO costs about the same
