@@ -92,6 +92,13 @@ Look there before starting anything:
 If you do work that is not on the board, file an issue for it. The board is
 only worth reading if it is complete.
 
+After creating, reopening, or materially updating an upstream GitHub issue, or
+after landing a pull request tied to an issue, run `../.agents/board-sync` from
+the workspace root before reporting completion. Require a zero exit and
+`failed 0`; otherwise the board may be incomplete. This reconciliation adds
+missing open issues and removes retired-repository items, but does not replace
+updating or closing the owning issue.
+
 Issues track what is **to be done**. Durable decisions stay in ADRs, validation
 evidence stays with the component that produced it, and the standing
 conventions stay in `AGENTS.md` files like this one — none of those belong in
