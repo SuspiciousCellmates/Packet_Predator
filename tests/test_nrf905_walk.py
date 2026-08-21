@@ -154,6 +154,17 @@ class PercentAndGapTests(unittest.TestCase):
         self.assertEqual(span, 8)
         self.assertEqual(longest, 3)
 
+    def test_gap_stats_treats_a_contiguous_wrap_as_four_frames(self):
+        self.assertEqual(_distinct_gap_stats({65534, 65535, 0, 1}), (4, 0, 4))
+
+    def test_gap_stats_counts_missing_frames_across_the_wrap(self):
+        # 65535 and 1 are missing from an otherwise five-frame window.
+        self.assertEqual(_distinct_gap_stats({65534, 0, 2}), (3, 1, 5))
+
+    def test_gap_stats_is_unchanged_by_duplicates_or_arrival_order(self):
+        received = [1, 65534, 0, 65534, 2, 0]
+        self.assertEqual(_distinct_gap_stats(set(received)), (4, 1, 5))
+
 
 class BurstResultTests(unittest.TestCase):
     def test_downlink_loss_is_zero_when_nothing_was_measured(self):

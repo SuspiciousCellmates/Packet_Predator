@@ -119,27 +119,33 @@ def percent_of(part: int, whole: int) -> int:
 def _distinct_gap_stats(sequences: set[int]) -> tuple[int, int, int]:
     """(received, longest_miss_run, span) from a set of distinct sequences seen.
 
-    span is the inclusive range between the lowest and highest sequence
-    observed -- how many beacons should have arrived in that window by the
-    sender's own count, independent of our transmit timing. This is the
-    denominator for downlink loss, and is what makes the measurement immune
-    to scheduler jitter: a frame's arrival time is never consulted, only
-    which sequence numbers showed up at all.
+    The 16-bit sequence field is circular.  The observed window is therefore
+    the smallest interval around that circle which contains every distinct
+    value: cut the circle at its largest missing run, then count the remaining
+    interval.  This is the denominator for downlink loss, and is what makes
+    the measurement immune to scheduler jitter: a frame's arrival time is
+    never consulted, only which sequence numbers showed up at all.
     """
 
     if not sequences:
         return 0, 0, 0
-    low, high = min(sequences), max(sequences)
-    span = high - low + 1
-    longest = 0
-    current = 0
-    for value in range(low, high + 1):
-        if value in sequences:
-            current = 0
-        else:
-            current += 1
-            longest = max(longest, current)
-    return len(sequences), longest, span
+    ordered = sorted(sequences)
+    circular_gaps = [
+        ((ordered[(index + 1) % len(ordered)] - value - 1) & 0xFFFF, index)
+        for index, value in enumerate(ordered)
+    ]
+    # A tie has no unique observed window.  Pick the earliest resulting start
+    # deterministically; either window has the same internally-consistent
+    # received, span, and loss counts.
+    exterior_gap, exterior_index = max(
+        circular_gaps,
+        key=lambda gap: (gap[0], -ordered[(gap[1] + 1) % len(ordered)]),
+    )
+    longest = max(
+        (gap for gap, index in circular_gaps if index != exterior_index),
+        default=0,
+    )
+    return len(sequences), longest, 0x10000 - exterior_gap
 
 
 @dataclass(frozen=True)
