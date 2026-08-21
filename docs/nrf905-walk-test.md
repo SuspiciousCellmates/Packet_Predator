@@ -195,9 +195,10 @@ dependency on which one you use, only on `--led` naming a working
 `timestamp` is wall-clock UTC from whichever Pi produced that line -- useful for lining up a `walk-carried` waypoints file against a `walk-fixed` log side by side (or against your own notes of when you crossed a particular spot), but only if both Pis' clocks actually agree. Check `date` on both before trusting a close correlation between them; nothing here corrects for drift.
 
 - `downlink_*` is what the carried node measured of the fixed node's beacons:
-  `downlink_span` is how many distinct fixed sequence numbers should exist
-  between the lowest and highest one actually seen; `downlink_received` is how
-  many of those were actually seen; `longest_miss_run` is the worst
+  `downlink_span` is how many fixed sequence numbers should exist in the
+  smallest 16-bit circular window containing the values actually seen;
+  `downlink_received` is how many of those were actually seen;
+  `longest_miss_run` is the worst
   consecutive gap, which is the number that decides playability -- a
   scattered 5% loss is survivable where 5% arriving as one run is not.
 - `uplink_*` is the fixed node's view of the carried node's beacons, recovered
