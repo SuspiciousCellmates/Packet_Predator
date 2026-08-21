@@ -271,6 +271,20 @@ class RunCarriedBurstTests(unittest.TestCase):
         self.assertEqual(first_sent.role, ROLE_CARRIED)
         self.assertEqual(first_sent.station, 7)
 
+    def test_uplink_delta_wraps_with_the_fixed_counter(self):
+        clock = ManualClock()
+        device = FakeWalkDevice(clock)
+        device.queue(self._fixed_frame(10, 65535))
+        device.queue(self._fixed_frame(11, 1))
+        led = FakeLed()
+
+        result = run_carried_burst(
+            device, led, station=7, slots=2, interval_s=0.02,
+            sleeper=clock.sleep, monotonic=clock,
+        )
+
+        self.assertEqual(result.uplink_delivered, 2)
+
     def test_a_failed_transmit_is_void_not_lost_and_blinking_is_independent_of_it(self):
         clock = ManualClock()
         device = FakeWalkDevice(clock, fail_transmit_slots={2})
@@ -391,6 +405,37 @@ class RunCarriedLoopTests(unittest.TestCase):
 
 
 class RunFixedLoopTests(unittest.TestCase):
+    def test_received_count_wraps_on_the_wire_and_the_loop_continues(self):
+        class OneCarriedFramePerInterval(FakeWalkDevice):
+            def __init__(self, clock, frame):
+                super().__init__(clock)
+                self._frame = frame
+
+            def wait_data_ready(self, timeout_s):
+                self._clock.sleep(timeout_s)
+                return True
+
+            def receive(self):
+                return self._frame
+
+        clock = ManualClock()
+        carried_frame = WalkFrame(
+            role=ROLE_CARRIED, station=4, sequence=1, received_count=0,
+        ).encode()
+        device = OneCarriedFramePerInterval(clock, carried_frame)
+
+        result = run_fixed_loop(
+            device, interval_s=0.01, max_iterations=65538,
+            sleeper=clock.sleep, monotonic=clock,
+        )
+
+        self.assertEqual(result.received, 65538)
+        reported_counts = [
+            decode_walk_frame(device.transmitted[index]).received_count
+            for index in (65535, 65536, 65537)
+        ]
+        self.assertEqual(reported_counts, [65535, 0, 1])
+
     def test_counts_valid_carried_frames_and_reports_running_total_when_sent(self):
         clock = ManualClock()
         device = FakeWalkDevice(clock)
