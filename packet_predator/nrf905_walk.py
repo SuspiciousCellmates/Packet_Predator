@@ -349,7 +349,7 @@ def run_carried_burst(
     if first_fixed_count is None or last_fixed_count is None:
         uplink_delivered = 0
     else:
-        uplink_delivered = last_fixed_count - first_fixed_count
+        uplink_delivered = (last_fixed_count - first_fixed_count) & 0xFFFF
 
     return BurstResult(
         station=station,
@@ -462,7 +462,9 @@ def run_fixed_loop(
                     role=ROLE_FIXED,
                     station=0,
                     sequence=own_sequence,
-                    received_count=received,
+                    # The local total is deliberately unbounded, but the
+                    # established walk-frame field is a 16-bit counter.
+                    received_count=received & 0xFFFF,
                 ).encode()
             )
             own_sequence = (own_sequence + 1) % 0x10000

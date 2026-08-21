@@ -229,10 +229,12 @@ the characterization afterward, not from an invented bar.
 
 ## Known limits
 
-- The fixed node's received-count is a 16-bit field and wraps at 65536. At
-  the 100 ms default that's roughly 1.8 hours of continuous successful
-  reception before a delta spanning the wrap would read wrong. Restart
-  `walk-fixed` if a walk runs that long.
+- The fixed node keeps its received total locally without a limit, while the
+  16-bit received-count carried in each beacon wraps at 65536. At the 100 ms
+  default that is roughly 1.8 hours of continuous successful reception. A
+  carried burst is far shorter than that, so its sampled counter delta remains
+  meaningful; do not use one burst to measure more than 65,535 carried
+  beacons.
 - The waypoints file is plain newline-delimited JSON, appended, never
   rotated or bounded -- there's a real filesystem under this, unlike the
   badge's 64-record NVS limit, so there's nothing to manage.
