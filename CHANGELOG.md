@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-24
+
+- Updated the supported workbench and finite recordings to consume stable
+  Protocol Contract 1.1.0 through the existing reference-codec boundary. This
+  changes no Packet Predator interface, transport behavior, or physical result.
+
 ## 2026-08-08
 
 - `walk-fixed` and `walk-carried` output (status lines, final report, and

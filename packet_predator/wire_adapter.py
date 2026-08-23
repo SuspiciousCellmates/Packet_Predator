@@ -11,6 +11,9 @@ from pathlib import Path
 from typing import Any
 
 
+REQUIRED_AUTHORITY_VERSION = "1.1.0"
+
+
 class AuthorityError(RuntimeError):
     """The released sibling authority cannot be found or loaded."""
 
@@ -71,7 +74,8 @@ class WireAdapter:
         if missing:
             joined = ", ".join(str(path) for path in missing)
             raise AuthorityError(
-                "The sibling Protocol Contract 1.0.2 checkout is incomplete. Missing: " + joined
+                f"The sibling Protocol Contract {REQUIRED_AUTHORITY_VERSION} checkout is "
+                f"incomplete. Missing: {joined}"
             )
 
         authority_text = str(self.authority_root)
@@ -86,9 +90,10 @@ class WireAdapter:
 
         self.registry_data = _read_object(registry_path)
         self.example_data = _read_object(examples_path)
-        if self.registry_data.get("version") != "1.0.2":
+        if self.registry_data.get("version") != REQUIRED_AUTHORITY_VERSION:
             raise AuthorityError(
-                "Packet Predator currently expects released Protocol Contract 1.0.2; "
+                "Packet Predator currently expects released Protocol Contract "
+                f"{REQUIRED_AUTHORITY_VERSION}; "
                 f"found {self.registry_data.get('version')!r}."
             )
         if self.registry_data.get("status") != "stable":
