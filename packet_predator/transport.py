@@ -33,6 +33,7 @@ class CarrierFrame:
     recording_id: str
     fixture_id: str
     note: str
+    timing: dict[str, Any] | None = None
 
 
 class ReceiveTransport(ABC):

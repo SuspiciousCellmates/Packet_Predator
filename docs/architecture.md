@@ -20,11 +20,11 @@ The archived runtime remains frozen as evidence by `.foundation/runtime-freeze.s
 | Replay catalogue | `packet_predator/replay.py`, `recordings/` | Validate finite recording timetables and resolve released example references without game behavior |
 | Transport | `packet_predator/transport.py` | Publish the opaque-frame receive boundary; provide inspect-only and explicitly selected deterministic replay adapters |
 | Physical adapter | `packet_predator/adapters/nrf905.py`, `packet_predator/adapters/nrf905_linux.py`, `packet_predator/nrf905_transport.py` | Configure and move opaque fixed frames through an explicitly selected nRF905; isolate Linux SPI/GPIO imports and know no message semantics |
-| Physical receiver | `packet_predator/receiver.py` | Own the configured adapter's receive lifecycle, wait for frames independently of browsers, and hand opaque frames to the service |
+| Physical receiver | `packet_predator/receiver.py` | Own the configured adapter's receive lifecycle, drain ready frames independently of browsers, and record bounded drain and overlap evidence |
 | Deployment profile | `packet_predator/nrf905_profile.py`, `config/` | Strictly validate local SPI, GPIO, and radio settings without making them shared protocol constants |
 | Pi service deployment | `packet_predator/systemd.py`, `packaging/`, `scripts/*systemd*` | Render and install one profile-explicit, loopback-only service as the ordinary Pi user |
 | Workbench service | `packet_predator/service.py` | Turn fixture, pasted, replay-delivered, or physically received bytes into inspectable observations |
-| Presentation model | `packet_predator/model.py` | Retain the newest 100 immutable observations, receiver state, monotonic revisions, and subscriber notifications |
+| Presentation model | `packet_predator/model.py` | Retain the newest 100 immutable observations with explicit rollover, bounded receiver-service timing, receiver state, monotonic revisions, and subscriber notifications |
 | Thin web layer | `packet_predator/web.py` | Own application lifespan, validate HTTP inputs, expose model snapshots/events, and serve static files |
 | Browser UI | `workbench_web/` | Observe model state; fork immutable observations into local drafts; present fixture browsing, editable Fields/Bytes, synchronized diffs/history, validation feedback, and byte drill-down without driving physical receive |
 
@@ -33,7 +33,7 @@ The physical-validation editor boundary is defined in
 the wire adapter/reference codec, immutable source observations, explicit
 process/build identity, and duplicate-safe validation-client transmit IDs.
 
-Dependency direction is web → service → model / receiver / replay catalogue / transport / wire adapter. For live capture, the application-lifecycle receiver waits on the physical transport, the service inspects each opaque frame, and the model publishes the resulting observation. The browser reads a snapshot and subscribes to model-revision events; browser timing never calls or backpressures the radio. The replay catalogue resolves examples through an injected wire-adapter operation, then gives opaque frames to the transport. The nRF905 transport accepts only complete fixed frames; it does not decode their fields. Linux-specific imports are confined to `packet_predator/adapters/nrf905_linux.py`. The wire adapter alone loads the sibling reference codec. The supported runtime imports none of the archived modules.
+Dependency direction is web → service → model / receiver / replay catalogue / transport / wire adapter. For live capture, the application-lifecycle receiver waits on the physical transport, the service inspects each opaque frame, and the model publishes the resulting observation. Kernel monotonic edge timing stays attached to the opaque capture until the model records bounded service summaries. The browser reads a snapshot and subscribes to model-revision events; browser timing never calls or backpressures the radio. The replay catalogue resolves examples through an injected wire-adapter operation, then gives opaque frames to the transport. The nRF905 transport accepts only complete fixed frames; it does not decode their fields. Linux-specific imports are confined to `packet_predator/adapters/nrf905_linux.py`. The wire adapter alone loads the sibling reference codec. The supported runtime imports none of the archived modules.
 
 ## Target boundaries
 

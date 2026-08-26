@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
+from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from ..nrf905_profile import Nrf905Profile
@@ -32,7 +33,7 @@ class DigitalLines(Protocol):
 
     def get(self, name: str) -> bool: ...
 
-    def wait(self, name: str, timeout_s: float) -> bool: ...
+    def wait(self, name: str, timeout_s: float) -> "DataReadyWait": ...
 
     def close(self) -> None: ...
 
@@ -43,6 +44,27 @@ _W_TX_FIFO = 0x20
 _W_TX_ADDRESS = 0x22
 _R_RX_FIFO = 0x24
 _FRAME_OCTETS = 32
+
+
+@dataclass(frozen=True)
+class DataReadyWait:
+    """One bounded DR wait and any kernel edge timestamp that caused it."""
+
+    ready: bool
+    edge_monotonic_ns: int | None
+    source: str
+
+    def __bool__(self) -> bool:
+        return self.ready
+
+
+@dataclass(frozen=True)
+class ReceivedFrame:
+    """Opaque payload plus userspace completion timestamps on the monotonic clock."""
+
+    frame: bytes
+    read_completed_monotonic_ns: int
+    reentry_completed_monotonic_ns: int
 
 
 def configuration_bytes(profile: Nrf905Profile) -> bytes:
@@ -113,26 +135,34 @@ class Nrf905Device:
                 "data_ready": self.lines.get("data_ready"),
             }
 
-    def wait_data_ready(self, timeout_s: float) -> bool:
+    def wait_data_ready(self, timeout_s: float) -> DataReadyWait:
         """Wait for receive readiness without holding the SPI/mode lock."""
         self._require_started()
-        if self.lines.get("data_ready"):
-            return True
         return self.lines.wait("data_ready", timeout_s)
 
     def receive(self) -> bytes | None:
+        received = self.receive_with_timing()
+        return None if received is None else received.frame
+
+    def receive_with_timing(self) -> ReceivedFrame | None:
         with self._lock:
             self._require_started()
             if not self.lines.get("data_ready"):
                 return None
             self.lines.set("trx_ce", False)
             frame = self._exchange(bytes([_R_RX_FIFO]) + bytes(_FRAME_OCTETS))[1:]
+            read_completed_monotonic_ns = self._monotonic_ns()
             if len(frame) != _FRAME_OCTETS:
                 raise Nrf905Error(
                     "NRF905_RECEIVE_LENGTH", f"Expected {_FRAME_OCTETS} received bytes, got {len(frame)}."
                 )
             self._receive_mode()
-            return frame
+            reentry_completed_monotonic_ns = self._monotonic_ns()
+            return ReceivedFrame(
+                frame=frame,
+                read_completed_monotonic_ns=read_completed_monotonic_ns,
+                reentry_completed_monotonic_ns=reentry_completed_monotonic_ns,
+            )
 
     def transmit(self, frame: bytes, timeout_s: float = 0.050) -> dict[str, object]:
         if len(frame) != _FRAME_OCTETS:
@@ -150,12 +180,12 @@ class Nrf905Device:
             self.lines.set("tx_en", True)
             self._exchange(bytes([_W_TX_ADDRESS]) + self.profile.radio.address)
             self._exchange(bytes([_W_TX_FIFO]) + frame)
-            started = self.monotonic()
+            started_ns = self._monotonic_ns()
             self.lines.set("trx_ce", True)
             self.sleep(0.000010)
             self.lines.set("trx_ce", False)
             while not self.lines.get("data_ready"):
-                if self.monotonic() - started >= timeout_s:
+                if (self._monotonic_ns() - started_ns) / 1_000_000_000 >= timeout_s:
                     self.lines.set("tx_en", False)
                     self._receive_mode()
                     raise Nrf905Error(
@@ -163,10 +193,22 @@ class Nrf905Device:
                         f"The nRF905 did not report transmit completion within {timeout_s * 1000:.0f} ms.",
                     )
                 self.sleep(0.000100)
-            elapsed_ms = (self.monotonic() - started) * 1000.0
+            tx_completion_ns = self._monotonic_ns()
             self.lines.set("tx_en", False)
             self._receive_mode()
-            return {"elapsed_ms": round(elapsed_ms, 3), "frame_hex": frame.hex()}
+            receive_reentry_ns = self._monotonic_ns()
+            return {
+                "tx_completion_ms": round((tx_completion_ns - started_ns) / 1_000_000, 3),
+                "receive_mode_reentry_ms": round(
+                    (receive_reentry_ns - started_ns) / 1_000_000,
+                    3,
+                ),
+                "tx_completion_to_receive_mode_reentry_ms": round(
+                    (receive_reentry_ns - tx_completion_ns) / 1_000_000,
+                    3,
+                ),
+                "frame_hex": frame.hex(),
+            }
 
     def close(self) -> None:
         with self._lock:
@@ -195,6 +237,9 @@ class Nrf905Device:
                 f"SPI returned {len(incoming)} bytes for a {len(outgoing)}-byte exchange.",
             )
         return incoming
+
+    def _monotonic_ns(self) -> int:
+        return round(self.monotonic() * 1_000_000_000)
 
     def _require_started(self) -> None:
         if not self._started:

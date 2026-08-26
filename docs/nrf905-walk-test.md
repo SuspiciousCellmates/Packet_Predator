@@ -160,6 +160,11 @@ dark carried node mid-walk now means either out of range or the instrument
 has stopped; there's no way to tell those apart from the LED alone, only from
 whether it resumes when you walk back.
 
+A dedicated LED worker performs each 50 ms visible pulse. The radio loop only
+queues the indication, so the LED hold does not consume half of the next 100 ms
+receive interval. Missing devices, permission errors, and background LED writes
+still fail the run with an explicit `LED_*` error.
+
 If the onboard LED turns out to be inconvenient or ambiguous on a given
 board, an external LED and resistor on a spare GPIO costs about the same
 wiring effort and removes the question outright -- there is no code

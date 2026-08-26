@@ -48,6 +48,7 @@ class FakeWalkDevice:
         self.fail_carrier_slots = fail_carrier_slots
         self.transmitted = []
         self._carrier_reads = 0
+        self.wait_timeouts = []
 
     def queue(self, frame):
         self._pending.append(frame)
@@ -67,6 +68,7 @@ class FakeWalkDevice:
         return {"carrier_detect": False}
 
     def wait_data_ready(self, timeout_s):
+        self.wait_timeouts.append(timeout_s)
         if self._pending:
             return True
         self._clock.sleep(timeout_s)
@@ -77,11 +79,21 @@ class FakeWalkDevice:
 
 
 class FakeLed:
-    def __init__(self):
+    def __init__(self, fail=False):
         self.blinks = 0
+        self.off_count = 0
+        self.fail = fail
+
+    def on(self):
+        if self.fail:
+            raise Nrf905Error("LED_WRITE", "simulated LED failure")
+        self.blinks += 1
+
+    def off(self):
+        self.off_count += 1
 
     def blink(self, seconds=0.05, sleeper=None):
-        self.blinks += 1
+        raise AssertionError("walk feedback must not blink synchronously in the receive slot")
 
 
 class WalkFrameEncodingTests(unittest.TestCase):
@@ -261,7 +273,7 @@ class RunCarriedBurstTests(unittest.TestCase):
 
         result = run_carried_burst(
             device, led, station=7, slots=5, interval_s=0.02,
-            sleeper=clock.sleep, monotonic=clock,
+            led_pulse_s=0, monotonic=clock,
         )
 
         self.assertEqual(result.slots_run, 5)
@@ -291,7 +303,7 @@ class RunCarriedBurstTests(unittest.TestCase):
 
         result = run_carried_burst(
             device, led, station=7, slots=2, interval_s=0.02,
-            sleeper=clock.sleep, monotonic=clock,
+            led_pulse_s=0, monotonic=clock,
         )
 
         self.assertEqual(result.uplink_delivered, 2)
@@ -305,7 +317,7 @@ class RunCarriedBurstTests(unittest.TestCase):
 
         result = run_carried_burst(
             device, led, station=1, slots=5, interval_s=0.01,
-            sleeper=clock.sleep, monotonic=clock,
+            led_pulse_s=0, monotonic=clock,
         )
 
         self.assertEqual(result.slots_run, 5)
@@ -323,7 +335,7 @@ class RunCarriedBurstTests(unittest.TestCase):
 
         result = run_carried_burst(
             device, led, station=1, slots=5, interval_s=0.01,
-            sleeper=clock.sleep, monotonic=clock,
+            led_pulse_s=0, monotonic=clock,
         )
 
         self.assertEqual(result.slots_run, 5)
@@ -343,7 +355,7 @@ class RunCarriedBurstTests(unittest.TestCase):
 
         result = run_carried_burst(
             device, led, station=1, slots=5, interval_s=0.01,
-            sleeper=clock.sleep, monotonic=clock,
+            led_pulse_s=0, monotonic=clock,
         )
 
         self.assertEqual(result.carrier_samples, 1)
@@ -361,7 +373,7 @@ class RunCarriedBurstTests(unittest.TestCase):
 
         result = run_carried_burst(
             device, led, station=1, slots=3, interval_s=0.01,
-            sleeper=clock.sleep, monotonic=clock,
+            led_pulse_s=0, monotonic=clock,
         )
 
         self.assertEqual(result.downlink_received, 0)
@@ -376,6 +388,45 @@ class RunCarriedBurstTests(unittest.TestCase):
         # Nothing arrived, so the LED never lit -- this is the "out of range"
         # signal the walk relies on: it goes dark, not just imprecise.
         self.assertEqual(led.blinks, 0)
+
+    def test_led_pulse_does_not_consume_the_receive_interval(self):
+        clock = ManualClock()
+        device = FakeWalkDevice(clock)
+        device.queue(self._fixed_frame(1, 1))
+        led = FakeLed()
+
+        run_carried_burst(
+            device,
+            led,
+            station=1,
+            slots=1,
+            interval_s=0.1,
+            led_pulse_s=0,
+            monotonic=clock,
+        )
+
+        self.assertEqual(led.blinks, 1)
+        self.assertGreaterEqual(len(device.wait_timeouts), 2)
+        self.assertAlmostEqual(device.wait_timeouts[0], 0.1)
+        self.assertAlmostEqual(device.wait_timeouts[1], 0.1)
+
+    def test_background_led_failure_is_reported(self):
+        clock = ManualClock()
+        device = FakeWalkDevice(clock)
+        device.queue(self._fixed_frame(1, 1))
+
+        with self.assertRaises(Nrf905Error) as raised:
+            run_carried_burst(
+                device,
+                FakeLed(fail=True),
+                station=1,
+                slots=1,
+                interval_s=0.1,
+                led_pulse_s=0,
+                monotonic=clock,
+            )
+
+        self.assertEqual(raised.exception.code, "LED_WRITE")
 
 
 class RunCarriedLoopTests(unittest.TestCase):
@@ -393,7 +444,7 @@ class RunCarriedLoopTests(unittest.TestCase):
 
         results = run_carried_loop(
             device, led, start_station=5, slots=2, interval_s=0.01,
-            stop=stop, on_result=on_result, sleeper=clock.sleep, monotonic=clock,
+            stop=stop, on_result=on_result, led_pulse_s=0, monotonic=clock,
         )
 
         self.assertEqual([result.station for result in results], [5, 6, 7])
@@ -408,7 +459,7 @@ class RunCarriedLoopTests(unittest.TestCase):
 
         results = run_carried_loop(
             device, led, start_station=1, slots=2, interval_s=0.01,
-            stop=stop, sleeper=clock.sleep, monotonic=clock,
+            stop=stop, led_pulse_s=0, monotonic=clock,
         )
 
         self.assertEqual(results, [])

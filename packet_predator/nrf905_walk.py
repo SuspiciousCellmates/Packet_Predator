@@ -274,13 +274,78 @@ class SysfsLed:
             raise Nrf905Error("LED_WRITE", f"Cannot write {self._brightness}: {exc}") from exc
 
 
+class LedPulseWorker:
+    """Drive 50 ms LED pulses outside the radio receive slot."""
+
+    def __init__(self, led: SysfsLed, pulse_s: float = 0.050) -> None:
+        if pulse_s < 0:
+            raise ValueError("LED pulse duration cannot be negative.")
+        self._led = led
+        self._pulse_s = pulse_s
+        self._condition = threading.Condition()
+        self._pending = 0
+        self._closing = False
+        self._error: Nrf905Error | None = None
+        self._thread = threading.Thread(
+            target=self._run,
+            name="PacketPredatorWalkLed",
+            daemon=False,
+        )
+        self._thread.start()
+
+    def pulse(self) -> None:
+        with self._condition:
+            self._raise_error_unlocked()
+            if self._closing:
+                raise Nrf905Error("LED_CLOSED", "The walk LED worker is already closed.")
+            self._pending += 1
+            self._condition.notify()
+
+    def close(self) -> None:
+        with self._condition:
+            self._closing = True
+            self._condition.notify_all()
+        self._thread.join()
+        with self._condition:
+            self._raise_error_unlocked()
+
+    def _run(self) -> None:
+        while True:
+            with self._condition:
+                self._condition.wait_for(lambda: self._pending > 0 or self._closing)
+                if self._pending == 0 and self._closing:
+                    return
+                self._pending -= 1
+            try:
+                self._led.on()
+                time.sleep(self._pulse_s)
+                self._led.off()
+            except Nrf905Error as exc:
+                self._record_error(exc)
+                return
+            except Exception as exc:
+                self._record_error(Nrf905Error("LED_WRITE", str(exc)))
+                return
+
+    def _record_error(self, error: Nrf905Error) -> None:
+        with self._condition:
+            self._error = error
+            self._pending = 0
+            self._closing = True
+            self._condition.notify_all()
+
+    def _raise_error_unlocked(self) -> None:
+        if self._error is not None:
+            raise self._error
+
+
 def run_carried_burst(
     device: Nrf905Device,
     led: SysfsLed,
     station: int,
     slots: int = 100,
     interval_s: float = 0.100,
-    sleeper: Callable[[float], None] = time.sleep,
+    led_pulse_s: float = 0.050,
     monotonic: Callable[[], float] = time.monotonic,
 ) -> BurstResult:
     """Walk to a spot, stop, run this once. It measures one station and returns.
@@ -304,52 +369,56 @@ def run_carried_burst(
     carrier_void = 0
     own_sequence = 0
 
-    for _ in range(slots):
-        slot_start = monotonic()
-        slots_run += 1
-        try:
-            device.transmit(
-                WalkFrame(
-                    role=ROLE_CARRIED,
-                    station=station,
-                    sequence=own_sequence,
-                    received_count=len(fixed_sequences),
-                ).encode()
-            )
-            own_sequence = (own_sequence + 1) % 0x10000
-        except Nrf905Error:
-            slots_void += 1
+    feedback = LedPulseWorker(led, led_pulse_s)
+    try:
+        for _ in range(slots):
+            slot_start = monotonic()
+            slots_run += 1
+            try:
+                device.transmit(
+                    WalkFrame(
+                        role=ROLE_CARRIED,
+                        station=station,
+                        sequence=own_sequence,
+                        received_count=len(fixed_sequences),
+                    ).encode()
+                )
+                own_sequence = (own_sequence + 1) % 0x10000
+            except Nrf905Error:
+                slots_void += 1
 
-        # Sampled once in the idle gap after our own transmit settles and
-        # before the next one -- never mid-transmit, where a high reading
-        # would just be our own traffic.
-        try:
-            busy = device.pin_status()["carrier_detect"]
-        except Nrf905Error:
-            carrier_void += 1
-        else:
-            carrier_samples += 1
-            if busy:
-                carrier_busy += 1
+            # Sampled once in the idle gap after our own transmit settles and
+            # before the next one -- never mid-transmit, where a high reading
+            # would just be our own traffic.
+            try:
+                busy = device.pin_status()["carrier_detect"]
+            except Nrf905Error:
+                carrier_void += 1
+            else:
+                carrier_samples += 1
+                if busy:
+                    carrier_busy += 1
 
-        deadline = slot_start + interval_s
-        while True:
-            remaining = deadline - monotonic()
-            if remaining <= 0:
-                break
-            if not device.wait_data_ready(remaining):
-                continue
-            frame = device.receive()
-            if frame is None:
-                continue
-            decoded = decode_walk_frame(frame)
-            if decoded is None or decoded.role != ROLE_FIXED:
-                continue
-            led.blink(sleeper=sleeper)
-            fixed_sequences.add(decoded.sequence)
-            if first_fixed_count is None:
-                first_fixed_count = decoded.received_count
-            last_fixed_count = decoded.received_count
+            deadline = slot_start + interval_s
+            while True:
+                remaining = deadline - monotonic()
+                if remaining <= 0:
+                    break
+                if not device.wait_data_ready(remaining):
+                    continue
+                frame = device.receive()
+                if frame is None:
+                    continue
+                decoded = decode_walk_frame(frame)
+                if decoded is None or decoded.role != ROLE_FIXED:
+                    continue
+                feedback.pulse()
+                fixed_sequences.add(decoded.sequence)
+                if first_fixed_count is None:
+                    first_fixed_count = decoded.received_count
+                last_fixed_count = decoded.received_count
+    finally:
+        feedback.close()
 
     received, longest_miss_run, span = _distinct_gap_stats(fixed_sequences)
     if first_fixed_count is None or last_fixed_count is None:
@@ -380,7 +449,7 @@ def run_carried_loop(
     interval_s: float = 0.100,
     stop: Optional[threading.Event] = None,
     on_result: Optional[Callable[[BurstResult], None]] = None,
-    sleeper: Callable[[float], None] = time.sleep,
+    led_pulse_s: float = 0.050,
     monotonic: Callable[[], float] = time.monotonic,
 ) -> list[BurstResult]:
     """Run consecutive bursts back to back, auto-incrementing the station
@@ -403,7 +472,7 @@ def run_carried_loop(
     while not stop.is_set():
         result = run_carried_burst(
             device, led, station=station, slots=slots, interval_s=interval_s,
-            sleeper=sleeper, monotonic=monotonic,
+            led_pulse_s=led_pulse_s, monotonic=monotonic,
         )
         results.append(result)
         if on_result is not None:

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections import deque
 from copy import deepcopy
+import math
+import statistics
 import threading
 import time
 from typing import Any, Callable
@@ -16,22 +18,37 @@ class WorkbenchModel:
         self,
         retention: int = 100,
         change_retention: int = 256,
+        metric_retention: int = 1024,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
+        if retention <= 0 or change_retention <= 0 or metric_retention <= 0:
+            raise ValueError("Model retention limits must be positive integers.")
         self._entries: deque[dict[str, Any]] = deque(maxlen=retention)
         self._changes: deque[dict[str, Any]] = deque(maxlen=change_retention)
+        self._metric_retention = metric_retention
+        self._receiver_span_samples: dict[str, deque[float]] = {}
+        self._receiver_span_discards: dict[str, int] = {}
+        self._receiver_span_worst: dict[str, float] = {}
         self._condition = threading.Condition(threading.RLock())
         self._subscribers: set[Callable[[int], None]] = set()
         self._clock = clock
         self._revision = 0
         self._journal_sequence = 0
+        self._journal_discarded_count = 0
         self._receiver = {
             "state": "stopped",
             "received_count": 0,
             "sent_count": 0,
             "invalid_count": 0,
+            "fault_count": 0,
             "last_error": None,
             "changed_at_ms": 0,
+            "service": {
+                "span_sample_retention": metric_retention,
+                "spans": {},
+                "receiver_service_high_water_ms": None,
+                "edge_or_frame_during_processing_count": 0,
+            },
         }
 
     def publish(self, entry: dict[str, Any]) -> dict[str, Any]:
@@ -40,6 +57,8 @@ class WorkbenchModel:
             stored = deepcopy(entry)
             stored["journal_sequence"] = self._journal_sequence
             self._journal_sequence += 1
+            if len(self._entries) == self._entries.maxlen:
+                self._journal_discarded_count += 1
             self._entries.appendleft(stored)
 
             capture = stored.get("capture") or {}
@@ -66,21 +85,64 @@ class WorkbenchModel:
                 self._receiver["state"] == state
                 and self._receiver["last_error"] == normalized_error
             ):
-                return deepcopy(self._receiver)
+                return self._receiver_unlocked()
             self._receiver["state"] = state
             self._receiver["last_error"] = normalized_error
+            if state == "faulted":
+                self._receiver["fault_count"] += 1
             self._receiver["changed_at_ms"] = round(self._clock() * 1000)
             self._record_change_unlocked("receiver")
-            return deepcopy(self._receiver)
+            return self._receiver_unlocked()
+
+    def record_receiver_metrics(
+        self,
+        spans_ms: dict[str, float | int | None] | None = None,
+        *,
+        edge_or_frame_during_processing: int = 0,
+    ) -> dict[str, Any]:
+        """Add bounded timing samples and explicit receiver-service activity."""
+
+        if edge_or_frame_during_processing < 0:
+            raise ValueError("Receiver activity increments cannot be negative.")
+        normalized: dict[str, float] = {}
+        for name, value in (spans_ms or {}).items():
+            if value is None:
+                continue
+            sample = float(value)
+            if not math.isfinite(sample) or sample < 0:
+                raise ValueError(f"Receiver timing sample {name!r} must be finite and non-negative.")
+            normalized[name] = round(sample, 3)
+
+        with self._condition:
+            for name, sample in normalized.items():
+                samples = self._receiver_span_samples.setdefault(
+                    name,
+                    deque(maxlen=self._metric_retention),
+                )
+                if len(samples) == samples.maxlen:
+                    self._receiver_span_discards[name] = (
+                        self._receiver_span_discards.get(name, 0) + 1
+                    )
+                samples.append(sample)
+                self._receiver_span_worst[name] = max(
+                    sample,
+                    self._receiver_span_worst.get(name, sample),
+                )
+
+            service = self._receiver["service"]
+            service["edge_or_frame_during_processing_count"] += (
+                edge_or_frame_during_processing
+            )
+            service["receiver_service_high_water_ms"] = self._receiver_span_worst.get(
+                "receiver_service_ms"
+            )
+            if normalized or edge_or_frame_during_processing:
+                self._record_change_unlocked("receiver")
+            return deepcopy(self._receiver_unlocked()["service"])
 
     def journal(self) -> dict[str, Any]:
         with self._condition:
-            entries = [self._summary(item) for item in self._entries]
-            return {
-                "entries": entries,
-                "count": len(entries),
-                "retention": f"process-local, newest {self._entries.maxlen}",
-            }
+            return self._journal_unlocked()
 
     def inspection(self, identifier: str) -> dict[str, Any] | None:
         with self._condition:
@@ -89,15 +151,10 @@ class WorkbenchModel:
 
     def snapshot(self) -> dict[str, Any]:
         with self._condition:
-            journal = {
-                "entries": [self._summary(item) for item in self._entries],
-                "count": len(self._entries),
-                "retention": f"process-local, newest {self._entries.maxlen}",
-            }
             return {
                 "revision": self._revision,
-                "receiver": deepcopy(self._receiver),
-                "journal": journal,
+                "receiver": self._receiver_unlocked(),
+                "journal": self._journal_unlocked(),
                 "latest": deepcopy(self._entries[0]) if self._entries else None,
             }
 
@@ -163,6 +220,47 @@ class WorkbenchModel:
                 deepcopy(change) for change in self._changes if change["revision"] > revision
             ],
         }
+
+    def _journal_unlocked(self) -> dict[str, Any]:
+        entries = [self._summary(item) for item in self._entries]
+        return {
+            "entries": entries,
+            "count": len(entries),
+            "retention": f"process-local, newest {self._entries.maxlen}",
+            "first_retained_journal_sequence": (
+                self._entries[-1]["journal_sequence"] if self._entries else None
+            ),
+            "latest_journal_sequence": (
+                self._entries[0]["journal_sequence"] if self._entries else None
+            ),
+            "discarded_count": self._journal_discarded_count,
+        }
+
+    def _receiver_spans_unlocked(self) -> dict[str, dict[str, float | int]]:
+        summaries: dict[str, dict[str, float | int]] = {}
+        for name, samples in self._receiver_span_samples.items():
+            ordered = sorted(samples)
+            discarded = self._receiver_span_discards.get(name, 0)
+            summaries[name] = {
+                "median_ms": round(statistics.median(ordered), 3),
+                "p95_ms": self._nearest_rank(ordered, 0.95),
+                "p99_ms": self._nearest_rank(ordered, 0.99),
+                "worst_ms": self._receiver_span_worst[name],
+                "sample_count": len(ordered),
+                "discarded_count": discarded,
+                "total_observed_count": len(ordered) + discarded,
+            }
+        return summaries
+
+    def _receiver_unlocked(self) -> dict[str, Any]:
+        receiver = deepcopy(self._receiver)
+        receiver["service"]["spans"] = self._receiver_spans_unlocked()
+        return receiver
+
+    @staticmethod
+    def _nearest_rank(ordered: list[float], proportion: float) -> float:
+        index = max(0, math.ceil(proportion * len(ordered)) - 1)
+        return ordered[index]
 
     @staticmethod
     def _summary(item: dict[str, Any]) -> dict[str, Any]:

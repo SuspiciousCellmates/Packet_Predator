@@ -8,6 +8,7 @@ from collections import OrderedDict
 import json
 import os
 from pathlib import Path
+import time
 from typing import Any, Callable
 from uuid import uuid4
 
@@ -48,9 +49,20 @@ class WorkbenchService:
         self._transmit_in_progress: dict[str, tuple[str, str, str]] = {}
         self._transmit_result_capacity = 256
         self._receiver = (
-            PhysicalReceiver(self.carrier, self.consume_physical, self.model.set_receiver_state)
+            PhysicalReceiver(
+                self.carrier,
+                self.consume_physical,
+                self.model.set_receiver_state,
+                self.model.record_receiver_metrics,
+                monotonic=self.carrier.monotonic,
+            )
             if isinstance(self.carrier, Nrf905Transport)
             else None
+        )
+        self._monotonic = (
+            self.carrier.monotonic
+            if isinstance(self.carrier, Nrf905Transport)
+            else time.monotonic
         )
 
     def start(self) -> None:
@@ -326,6 +338,7 @@ class WorkbenchService:
 
     def consume_physical(self, item: CarrierFrame) -> dict[str, Any]:
         carrier = self._physical_carrier()
+        decode_started = self._monotonic()
         capture = {
             "transport": "nrf905",
             "profile_id": carrier.profile.identifier,
@@ -333,6 +346,7 @@ class WorkbenchService:
             "observed_at_ms": item.at_ms,
             "direction": item.direction,
             "note": item.note,
+            "timing": dict(item.timing or {}),
         }
         try:
             result = self.wire.inspect(item.frame.hex(), "fixed")
@@ -345,7 +359,27 @@ class WorkbenchService:
                 "family": {"id": "invalid", "label": "Invalid frame"},
                 "inspection_error": exc.as_dict(),
             }
-        return self._store(result, f"nrf905: {carrier.profile.identifier}", capture)
+        decode_completed = self._monotonic()
+        if item.direction == "received":
+            capture["timing"]["decode_ms"] = round(
+                (decode_completed - decode_started) * 1000.0,
+                3,
+            )
+        publication_started = self._monotonic()
+        stored = self._store(result, f"nrf905: {carrier.profile.identifier}", capture)
+        publication_completed = self._monotonic()
+
+        if item.direction == "received":
+            spans = {
+                name: value
+                for name, value in capture["timing"].items()
+                if name.endswith("_ms") and isinstance(value, (int, float))
+            }
+            spans["model_publication_ms"] = (
+                publication_completed - publication_started
+            ) * 1000.0
+            self.model.record_receiver_metrics(spans)
+        return stored
 
     def _physical_carrier(self) -> Nrf905Transport:
         if not isinstance(self.carrier, Nrf905Transport):
