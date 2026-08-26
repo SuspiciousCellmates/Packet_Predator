@@ -271,8 +271,12 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(result["revision"], 1)
         self.assertEqual(result["journal"]["count"], 1)
+        self.assertEqual(result["journal"]["first_retained_journal_sequence"], 0)
+        self.assertEqual(result["journal"]["latest_journal_sequence"], 0)
+        self.assertEqual(result["journal"]["discarded_count"], 0)
         self.assertEqual(result["latest"]["origin"], "model API test")
         self.assertEqual(result["receiver"]["state"], "stopped")
+        self.assertIn("service", result["receiver"])
 
     def test_model_event_stream_route_is_registered(self):
         paths = {getattr(route, "path", None) for route in app.routes}

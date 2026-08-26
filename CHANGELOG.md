@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-08-27
+
+- Physical receiver snapshots now retain bounded summaries for kernel edge to
+  adapter lock, payload read, receive-mode re-entry, batch drain, Protocol
+  decode, model publication, and total receiver service. They also report
+  processing-overlap events, spurious wakes, level-only readiness, and receiver
+  faults. This is host-tested instrumentation, not a claim about installed Pi
+  kernel or over-air timing.
+- The newest-100 journal now reports its first and latest retained sequence and
+  discarded count. Metric samples have their own explicit 1,024-sample bound
+  and discarded count.
+- Transmit evidence separates hardware `DR` completion from receive-mode pin
+  re-entry. `walk-carried` moves its 50 ms LED hold to a dedicated worker while
+  keeping LED failures fatal.
+
 ## 2026-08-24
 
 - Updated the supported workbench and finite recordings to consume stable

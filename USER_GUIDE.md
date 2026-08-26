@@ -145,7 +145,11 @@ If the message is incomplete or breaks the shared rules, Packet Predator display
 
 Every message you inspect during the current run appears under **Recently inspected**. Selecting an entry opens it again.
 
-This journal is temporary. It is cleared when Packet Predator stops, and it is not yet a permanent game record. If you need to preserve something important, copy the text or take a screenshot before stopping the program.
+This journal is temporary. It keeps the newest 100 observations and is cleared
+when Packet Predator stops. The service reports the first and latest retained
+sequence plus how many older entries it discarded. If that discarded count is
+above zero, the page is not showing the complete capture. Save important exact
+bytes and the service snapshot before stopping the program.
 
 ## Starting Packet Predator on an already prepared computer
 
@@ -220,6 +224,11 @@ If radio bytes pass the hardware address and CRC checks but do not form a valid
 Protocol Contract message, Packet Predator retains their exact hexadecimal
 bytes and shows a structured decode error. One bad frame does not stop later
 valid frames from being captured.
+
+The service snapshot also records how long physical capture, Protocol decoding,
+and journal publication took. These measurements continue while the browser is
+closed. They help a later controlled Pi test reveal whether processing overlaps
+the next radio frame, but laptop tests do not prove Raspberry Pi kernel timing.
 
 To send a frame from the browser:
 

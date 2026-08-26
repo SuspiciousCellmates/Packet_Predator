@@ -6,7 +6,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
-from .nrf905 import Nrf905Error
+from .nrf905 import DataReadyWait, Nrf905Error
 from ..nrf905_profile import Nrf905Profile
 
 
@@ -57,7 +57,7 @@ class LinuxDigitalLines:
             )
         try:
             import gpiod
-            from gpiod.line import Bias, Direction, Edge, Value
+            from gpiod.line import Bias, Clock, Direction, Edge, Value
         except ImportError as exc:
             raise Nrf905Error(
                 "NRF905_GPIO_DEPENDENCY",
@@ -87,6 +87,7 @@ class LinuxDigitalLines:
                         direction=Direction.INPUT,
                         bias=Bias.DISABLED,
                         edge_detection=Edge.RISING,
+                        event_clock=Clock.MONOTONIC,
                     ),
                 },
             )
@@ -105,18 +106,46 @@ class LinuxDigitalLines:
             raise Nrf905Error("NRF905_GPIO_DIRECTION", f"{name} is not an input signal.")
         return self._request.get_value(self._offsets[name]) == self._value.ACTIVE
 
-    def wait(self, name: str, timeout_s: float) -> bool:
+    def wait(self, name: str, timeout_s: float) -> DataReadyWait:
         if name != "data_ready":
             raise Nrf905Error(
                 "NRF905_GPIO_WAIT",
                 "Only the nRF905 data_ready signal supports event waiting.",
             )
         if self.get(name):
-            return True
+            timestamp = self._read_edge_timestamp_if_pending()
+            return DataReadyWait(
+                ready=True,
+                edge_monotonic_ns=timestamp,
+                source="edge" if timestamp is not None else "level",
+            )
         ready = self._request.wait_edge_events(timeout=timedelta(seconds=max(0.0, timeout_s)))
+        timestamp = self._read_latest_edge_timestamp() if ready else None
+        level_high = self.get(name)
+        if level_high:
+            return DataReadyWait(
+                ready=True,
+                edge_monotonic_ns=timestamp,
+                source="edge" if timestamp is not None else "level",
+            )
         if ready:
-            self._request.read_edge_events()
-        return self.get(name)
+            return DataReadyWait(
+                ready=False,
+                edge_monotonic_ns=timestamp,
+                source="edge-without-ready-level",
+            )
+        return DataReadyWait(ready=False, edge_monotonic_ns=None, source="timeout")
+
+    def _read_edge_timestamp_if_pending(self) -> int | None:
+        if not self._request.wait_edge_events(timeout=timedelta(0)):
+            return None
+        return self._read_latest_edge_timestamp()
+
+    def _read_latest_edge_timestamp(self) -> int | None:
+        events = self._request.read_edge_events()
+        if not events:
+            return None
+        return events[-1].timestamp_ns
 
     def close(self) -> None:
         self._request.release()

@@ -43,6 +43,37 @@ class WorkbenchModelTests(unittest.TestCase):
         self.assertIsNone(model.inspection("one"))
         self.assertEqual(model.snapshot()["receiver"]["received_count"], 2)
         self.assertEqual(model.snapshot()["receiver"]["sent_count"], 1)
+        self.assertEqual(journal["first_retained_journal_sequence"], 1)
+        self.assertEqual(journal["latest_journal_sequence"], 2)
+        self.assertEqual(journal["discarded_count"], 1)
+
+    def test_empty_journal_has_explicit_retention_boundaries(self):
+        journal = WorkbenchModel().journal()
+
+        self.assertIsNone(journal["first_retained_journal_sequence"])
+        self.assertIsNone(journal["latest_journal_sequence"])
+        self.assertEqual(journal["discarded_count"], 0)
+
+    def test_receiver_metric_overflow_is_bounded_and_visible(self):
+        model = WorkbenchModel(metric_retention=2)
+        model.record_receiver_metrics({"decode_ms": 1.0, "receiver_service_ms": 2.0})
+        model.record_receiver_metrics({"decode_ms": 3.0, "receiver_service_ms": 4.0})
+        model.record_receiver_metrics(
+            {"decode_ms": 5.0, "receiver_service_ms": 6.0},
+            edge_or_frame_during_processing=1,
+        )
+
+        service = model.snapshot()["receiver"]["service"]
+        decode = service["spans"]["decode_ms"]
+        self.assertEqual(decode["sample_count"], 2)
+        self.assertEqual(decode["discarded_count"], 1)
+        self.assertEqual(decode["total_observed_count"], 3)
+        self.assertEqual(decode["median_ms"], 4.0)
+        self.assertEqual(decode["p95_ms"], 5.0)
+        self.assertEqual(decode["p99_ms"], 5.0)
+        self.assertEqual(decode["worst_ms"], 5.0)
+        self.assertEqual(service["receiver_service_high_water_ms"], 6.0)
+        self.assertEqual(service["edge_or_frame_during_processing_count"], 1)
 
     def test_invalid_observation_and_receiver_fault_are_visible(self):
         model = WorkbenchModel()
@@ -55,6 +86,7 @@ class WorkbenchModelTests(unittest.TestCase):
         snapshot = model.snapshot()
         self.assertEqual(snapshot["receiver"]["invalid_count"], 1)
         self.assertEqual(snapshot["receiver"]["state"], "faulted")
+        self.assertEqual(snapshot["receiver"]["fault_count"], 1)
         self.assertEqual(snapshot["receiver"]["last_error"]["code"], "GPIO_FAILED")
         self.assertEqual(snapshot["latest"]["inspection_error"]["code"], "TEST_INVALID")
 

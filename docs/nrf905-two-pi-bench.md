@@ -212,6 +212,11 @@ one-shot confirmation checkbox in the page. Receive, transmit, and shutdown
 operations are serialized, and the adapter returns to receive mode immediately
 after a transmit attempt. These are accident barriers, not authentication.
 
+The model snapshot exposes kernel-edge-to-capture, decode, publication, batch
+drain, processing-overlap, receiver-fault, and journal-rollover evidence. Follow
+[physical capture service observability](capture-service-observability.md)
+before making a controlled-burst timing or retained-evidence claim.
+
 ### Continuous-receive follow-up still required
 
 The original exact one-frame exchange passed on 2026-07-24. After that test,

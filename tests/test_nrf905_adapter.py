@@ -1,12 +1,20 @@
 from collections import deque
+from datetime import timedelta
 import json
 import tempfile
 import threading
 import time
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
-from packet_predator.adapters.nrf905 import Nrf905Device, Nrf905Error, configuration_bytes
+from packet_predator.adapters.nrf905 import (
+    DataReadyWait,
+    Nrf905Device,
+    Nrf905Error,
+    configuration_bytes,
+)
+from packet_predator.adapters.nrf905_linux import LinuxDigitalLines
 from packet_predator.nrf905_profile import Nrf905ProfileError, load_nrf905_profile
 from packet_predator.nrf905_transport import Nrf905Transport
 from packet_predator.service import WorkbenchService
@@ -38,6 +46,8 @@ class FakeLines:
         self.closed = False
         self.close_count = 0
         self.wait_error = None
+        self.edge_monotonic_ns = None
+        self.scripted_waits = deque()
         self.condition = threading.Condition()
 
     def set(self, name, active):
@@ -56,9 +66,18 @@ class FakeLines:
     def wait(self, name, timeout_s):
         if self.wait_error is not None:
             raise self.wait_error
+        if self.scripted_waits:
+            return self.scripted_waits.popleft()
         with self.condition:
             self.condition.wait_for(lambda: self.inputs[name], timeout_s)
-            return self.inputs[name]
+            ready = self.inputs[name]
+            timestamp = self.edge_monotonic_ns
+            self.edge_monotonic_ns = None
+            return DataReadyWait(
+                ready=ready,
+                edge_monotonic_ns=timestamp,
+                source=("edge" if timestamp is not None else "level") if ready else "timeout",
+            )
 
     def set_input(self, name, active):
         with self.condition:
@@ -111,6 +130,27 @@ class FakeSpi:
 
     def close(self):
         self.closed = True
+
+
+class FakeEdgeRequest:
+    def __init__(self, levels, events=()):
+        self.levels = deque(levels)
+        self.events = list(events)
+        self.wait_timeouts = []
+        self.read_count = 0
+
+    def get_value(self, offset):
+        return self.levels.popleft()
+
+    def wait_edge_events(self, timeout):
+        self.wait_timeouts.append(timeout)
+        return bool(self.events)
+
+    def read_edge_events(self):
+        self.read_count += 1
+        events = self.events
+        self.events = []
+        return events
 
 
 def transmitting_profile():
@@ -178,6 +218,41 @@ class ProfileTests(unittest.TestCase):
                 load_nrf905_profile(path)
 
 
+class LinuxDigitalLinesTests(unittest.TestCase):
+    def test_wait_carries_latest_kernel_edge_timestamp_after_level_recheck(self):
+        lines = self._lines(
+            levels=[False, True],
+            events=[SimpleNamespace(timestamp_ns=1_000), SimpleNamespace(timestamp_ns=2_000)],
+        )
+
+        result = lines.wait("data_ready", 0.125)
+
+        self.assertTrue(result)
+        self.assertEqual(result.edge_monotonic_ns, 2_000)
+        self.assertEqual(result.source, "edge")
+        self.assertEqual(lines._request.read_count, 1)
+        self.assertEqual(lines._request.wait_timeouts, [timedelta(seconds=0.125)])
+
+    def test_wait_preserves_already_high_level_without_inventing_timestamp(self):
+        lines = self._lines(levels=[True])
+
+        result = lines.wait("data_ready", 0.125)
+
+        self.assertTrue(result)
+        self.assertIsNone(result.edge_monotonic_ns)
+        self.assertEqual(result.source, "level")
+        self.assertEqual(lines._request.read_count, 0)
+        self.assertEqual(lines._request.wait_timeouts, [timedelta(0)])
+
+    @staticmethod
+    def _lines(levels, events=()):
+        lines = LinuxDigitalLines.__new__(LinuxDigitalLines)
+        lines._offsets = {"data_ready": 17}
+        lines._value = SimpleNamespace(ACTIVE=True, INACTIVE=False)
+        lines._request = FakeEdgeRequest(levels, events)
+        return lines
+
+
 class DeviceTests(unittest.TestCase):
     def setUp(self):
         self.directory, self.profile = transmitting_profile()
@@ -217,6 +292,27 @@ class DeviceTests(unittest.TestCase):
         self.assertTrue(self.lines.outputs["trx_ce"])
         self.assertFalse(self.lines.inputs["data_ready"])
 
+    def test_wait_propagates_kernel_monotonic_edge_timestamp(self):
+        self.device.start()
+        self.lines.inputs["data_ready"] = True
+        self.lines.edge_monotonic_ns = 1_234_567
+
+        result = self.device.wait_data_ready(0.1)
+
+        self.assertTrue(result)
+        self.assertEqual(result.edge_monotonic_ns, 1_234_567)
+        self.assertEqual(result.source, "edge")
+
+    def test_wait_preserves_already_high_level_without_inventing_edge_time(self):
+        self.device.start()
+        self.lines.inputs["data_ready"] = True
+
+        result = self.device.wait_data_ready(0.1)
+
+        self.assertTrue(result)
+        self.assertIsNone(result.edge_monotonic_ns)
+        self.assertEqual(result.source, "level")
+
     def test_transmit_writes_address_and_exact_frame(self):
         self.device.start()
         frame = bytes(reversed(range(32)))
@@ -224,6 +320,12 @@ class DeviceTests(unittest.TestCase):
         self.assertEqual(self.spi.tx_address, self.profile.radio.address)
         self.assertEqual(self.spi.tx_frame, frame)
         self.assertEqual(result["frame_hex"], frame.hex())
+        self.assertIn("tx_completion_ms", result)
+        self.assertIn("receive_mode_reentry_ms", result)
+        self.assertGreaterEqual(
+            result["receive_mode_reentry_ms"],
+            result["tx_completion_ms"],
+        )
         self.assertEqual(self.lines.outputs, {"pwr_up": True, "trx_ce": True, "tx_en": False})
 
     def test_invalid_transmit_length_fails_before_spi(self):
@@ -243,11 +345,33 @@ class DeviceTests(unittest.TestCase):
         transport = Nrf905Transport(self.profile, self.device, self.clock)
         self.spi.rx_frame = bytes(range(32))
         self.lines.inputs["data_ready"] = True
+        self.lines.edge_monotonic_ns = round((self.clock.now - 0.001) * 1_000_000_000)
         captured = transport.poll()[0]
         self.assertEqual(captured.frame, bytes(range(32)))
         self.assertEqual(captured.direction, "received")
         self.assertEqual(captured.frame_mode, "fixed")
+        self.assertEqual(captured.timing["edge_to_lock_ms"], 1.0)
+        self.assertEqual(captured.timing["edge_to_payload_read_ms"], 1.0)
         self.assertEqual(transport.status()["mode"], "nrf905")
+
+    def test_spurious_transmit_edge_does_not_create_a_received_frame(self):
+        transport = Nrf905Transport(self.profile, self.device, self.clock)
+        stop = threading.Event()
+        expected = bytes(range(32))
+        self.spi.rx_frame = expected
+        edge_ns = round(self.clock.now * 1_000_000_000)
+        self.lines.scripted_waits.extend(
+            [
+                DataReadyWait(False, edge_ns, "edge-without-ready-level"),
+                DataReadyWait(True, edge_ns, "edge"),
+            ]
+        )
+        self.lines.inputs["data_ready"] = True
+
+        captured = transport.wait_for_frame(stop)
+
+        self.assertEqual(captured.frame, expected)
+        self.assertEqual(transport.status()["receive_wait"]["spurious_wake_count"], 1)
 
     def test_transport_status_remains_available_when_pin_read_fails(self):
         transport = Nrf905Transport(self.profile, self.device, self.clock)
@@ -297,6 +421,10 @@ class PhysicalServiceTests(unittest.TestCase):
         self.assertEqual(result["delivered"][0]["meaning"]["name"], "CONTROLLER_BEACON")
         self.assertEqual(result["delivered"][0]["capture"]["transport"], "nrf905")
         self.assertEqual(result["delivered"][0]["capture"]["direction"], "sent")
+        timing = result["delivered"][0]["capture"]["timing"]
+        self.assertIn("tx_completion_ms", timing)
+        self.assertIn("receive_mode_reentry_ms", timing)
+        self.assertIn("tx_completion_to_receive_mode_reentry_ms", timing)
 
     def test_service_deduplicates_named_transmit_request(self):
         example = self.wire.resolve_example("v1-controller-beacon", "logical")
@@ -410,6 +538,54 @@ class PhysicalServiceTests(unittest.TestCase):
         )
         self.assertEqual(self.service.model_state()["receiver"]["received_count"], 2)
 
+    def test_receiver_reports_batch_decode_publication_and_reentry_spans(self):
+        first = self.wire.resolve_example("v1-controller-beacon", "fixed")
+        second = self.wire.resolve_example("v1-node-status", "fixed")
+        original_inspect = self.service.wire.inspect
+        original_publish = self.service.model.publish
+        publish_count = 0
+
+        def slow_inspect(frame_text, mode):
+            self.clock.sleep(0.004)
+            return original_inspect(frame_text, mode)
+
+        def slow_publish(entry):
+            nonlocal publish_count
+            publish_count += 1
+            if publish_count == 1:
+                self.lines.edge_monotonic_ns = round(self.clock.now * 1_000_000_000)
+                self.spi.queue_receive(bytes.fromhex(second["frame_hex"]))
+            self.clock.sleep(0.006)
+            return original_publish(entry)
+
+        self.service.wire.inspect = slow_inspect
+        self.service.model.publish = slow_publish
+        self.lines.edge_monotonic_ns = round(self.clock.now * 1_000_000_000)
+        self.service.start()
+        self.spi.queue_receive(bytes.fromhex(first["frame_hex"]))
+
+        self._wait_for_journal_count(2)
+        state = self.service.model_state()
+        service_metrics = state["receiver"]["service"]
+
+        self.assertIn("batch_drain_ms", service_metrics["spans"])
+        self.assertEqual(service_metrics["spans"]["decode_ms"]["median_ms"], 4.0)
+        self.assertEqual(
+            service_metrics["spans"]["model_publication_ms"]["median_ms"],
+            6.0,
+        )
+        self.assertEqual(service_metrics["receiver_service_high_water_ms"], 10.0)
+        self.assertEqual(service_metrics["edge_or_frame_during_processing_count"], 1)
+        self.assertIn("edge_to_payload_read_ms", service_metrics["spans"])
+        self.assertIn(
+            "payload_read_to_receive_reentry_ms",
+            service_metrics["spans"],
+        )
+        self.assertEqual(
+            state["journal"]["latest_journal_sequence"],
+            1,
+        )
+
     def test_invalid_frame_is_retained_and_receiver_continues(self):
         valid = self.wire.resolve_example("v1-node-status", "fixed")
         self.service.start()
@@ -450,6 +626,7 @@ class PhysicalServiceTests(unittest.TestCase):
             self.fail("receiver fault was not published")
 
         self.assertEqual(receiver["last_error"]["code"], "NRF905_GPIO_WAIT")
+        self.assertEqual(receiver["fault_count"], 1)
         self.assertFalse(self.service._receiver.running)
 
     def test_close_is_idempotent_and_releases_hardware_once(self):
@@ -457,6 +634,14 @@ class PhysicalServiceTests(unittest.TestCase):
         self.service.close()
         self.service.close()
         self.assertEqual(self.lines.close_count, 1)
+
+    def test_receiver_shutdown_is_bounded_by_the_cancellation_wait(self):
+        self.service.start()
+        started = time.monotonic()
+
+        self.service.close()
+
+        self.assertLess(time.monotonic() - started, 0.5)
 
     def _wait_for_journal_count(self, expected):
         deadline = time.monotonic() + 1.0

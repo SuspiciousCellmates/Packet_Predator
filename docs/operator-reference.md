@@ -121,7 +121,8 @@ one RF test need matching physical settings.
 The supported workbench retains:
 
 - the newest 100 immutable observations;
-- receiver state and counts;
+- explicit first/latest retained journal sequences and a discarded count;
+- receiver state, receive/send/invalid/fault counts, and capture-service timing;
 - a monotonic model revision;
 - a monotonic process-local `journal_sequence`; and
 - the newest 256 model change notifications.
@@ -130,8 +131,17 @@ This is a bounded presentation model, not a permanent evidence store.
 Restarting Packet Predator clears it. Preserve important API snapshots, exact
 bytes, and the process/deployment revision as part of the validation run.
 
+`/api/workbench/state` reports the newest 1,024 samples for each physical
+receiver span. Each summary includes median, p95, p99, worst, retained sample
+count, discarded sample count, and total observed count. It also reports the
+receiver-service high-water value and frames found ready after a pre-decode
+drain but before decode/model publication finished. See [physical capture
+service observability](capture-service-observability.md) for the field meanings
+and controlled-burst evidence checklist.
+
 Use `journal_sequence` to order observations from one Packet Predator process.
-Do not infer cross-host causal order from display timestamps.
+If `discarded_count` is above zero, the retained journal is not the process's
+complete capture. Do not infer cross-host causal order from display timestamps.
 
 ## Transmit safety
 
