@@ -102,6 +102,13 @@ capture at that instant. Only physical follow-up traffic can establish that.
 The profile transmit permission, one-shot request confirmation, exact bytes,
 and absence of automatic retry remain unchanged.
 
+If an SPI or GPIO operation fails during transmission, the adapter makes one
+receive-mode cleanup attempt and returns the original transmit error when that
+cleanup succeeds. If the cleanup also fails, the result remains an unknown
+transmit outcome, the receiver stops, and the model reports
+`NRF905_RECEIVE_REENTRY_FAILED`. The service never reports `listening` after
+that failure and never retries the RF request.
+
 ## Controlled burst evidence
 
 On the prepared Pi, run the normal repository check and start the explicit
