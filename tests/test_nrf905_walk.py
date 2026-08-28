@@ -7,6 +7,7 @@ from packet_predator.nrf905_walk import (
     ROLE_CARRIED,
     ROLE_FIXED,
     BurstResult,
+    LedPulseWorker,
     SysfsLed,
     WalkFrame,
     WalkFrameError,
@@ -49,6 +50,7 @@ class FakeWalkDevice:
         self.transmitted = []
         self._carrier_reads = 0
         self.wait_timeouts = []
+        self._wait_condition = threading.Condition()
 
     def queue(self, frame):
         self._pending.append(frame)
@@ -68,32 +70,73 @@ class FakeWalkDevice:
         return {"carrier_detect": False}
 
     def wait_data_ready(self, timeout_s):
-        self.wait_timeouts.append(timeout_s)
+        with self._wait_condition:
+            self.wait_timeouts.append(timeout_s)
+            self._wait_condition.notify_all()
         if self._pending:
             return True
         self._clock.sleep(timeout_s)
         return False
+
+    def wait_for_receive_waits(self, count, timeout=1):
+        with self._wait_condition:
+            return self._wait_condition.wait_for(
+                lambda: len(self.wait_timeouts) >= count,
+                timeout=timeout,
+            )
 
     def receive(self):
         return self._pending.popleft() if self._pending else None
 
 
 class FakeLed:
-    def __init__(self, fail=False):
+    def __init__(self, fail_off=False):
         self.blinks = 0
         self.off_count = 0
-        self.fail = fail
+        self.fail_off = fail_off
 
     def on(self):
-        if self.fail:
-            raise Nrf905Error("LED_WRITE", "simulated LED failure")
         self.blinks += 1
 
     def off(self):
+        if self.fail_off:
+            raise Nrf905Error("LED_WRITE", "simulated LED off failure")
         self.off_count += 1
 
     def blink(self, seconds=0.05, sleeper=None):
         raise AssertionError("walk feedback must not blink synchronously in the receive slot")
+
+
+class BlockingSleeper:
+    """Block each sleep call until its matching release from the test."""
+
+    def __init__(self):
+        self._condition = threading.Condition()
+        self.calls = []
+        self._released = 0
+
+    def __call__(self, seconds):
+        with self._condition:
+            call_index = len(self.calls)
+            self.calls.append(seconds)
+            self._condition.notify_all()
+            if not self._condition.wait_for(
+                lambda: self._released > call_index,
+                timeout=1,
+            ):
+                raise AssertionError("test did not release blocked LED pulse")
+
+    def wait_for_calls(self, count, timeout=1):
+        with self._condition:
+            return self._condition.wait_for(
+                lambda: len(self.calls) >= count,
+                timeout=timeout,
+            )
+
+    def release_next(self):
+        with self._condition:
+            self._released += 1
+            self._condition.notify_all()
 
 
 class WalkFrameEncodingTests(unittest.TestCase):
@@ -259,6 +302,72 @@ class SysfsLedTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "LED_DEVICE_MISSING")
 
 
+class LedPulseWorkerTests(unittest.TestCase):
+    def test_pressure_coalesces_and_close_waits_only_for_the_active_pulse(self):
+        led = FakeLed()
+        sleeper = BlockingSleeper()
+        worker = LedPulseWorker(led, pulse_s=0.05, sleeper=sleeper)
+
+        worker.pulse()
+        self.assertTrue(sleeper.wait_for_calls(1))
+        for _ in range(1000):
+            worker.pulse()
+
+        status = worker.status()
+        self.assertTrue(status["active"])
+        self.assertTrue(status["pending"])
+        self.assertEqual(status["coalesced_count"], 999)
+
+        close_error = []
+
+        def close_worker():
+            try:
+                worker.close()
+            except Exception as exc:  # pragma: no cover - asserted below
+                close_error.append(exc)
+
+        closer = threading.Thread(target=close_worker)
+        closer.start()
+        with worker._condition:
+            self.assertTrue(
+                worker._condition.wait_for(lambda: worker._closing, timeout=1)
+            )
+
+        status = worker.status()
+        self.assertTrue(status["active"])
+        self.assertFalse(status["pending"])
+        self.assertTrue(closer.is_alive())
+
+        sleeper.release_next()
+        closer.join(timeout=1)
+
+        self.assertFalse(closer.is_alive())
+        self.assertEqual(close_error, [])
+        self.assertEqual(sleeper.calls, [0.05])
+        self.assertEqual(led.blinks, 1)
+        self.assertEqual(led.off_count, 1)
+
+    def test_background_error_discards_pressure_and_remains_explicit(self):
+        led = FakeLed(fail_off=True)
+        sleeper = BlockingSleeper()
+        worker = LedPulseWorker(led, pulse_s=0.05, sleeper=sleeper)
+
+        worker.pulse()
+        self.assertTrue(sleeper.wait_for_calls(1))
+        for _ in range(1000):
+            worker.pulse()
+
+        self.assertTrue(worker.status()["pending"])
+        sleeper.release_next()
+
+        with self.assertRaises(Nrf905Error) as raised:
+            worker.close()
+
+        self.assertEqual(raised.exception.code, "LED_WRITE")
+        self.assertEqual(sleeper.calls, [0.05])
+        self.assertFalse(worker.status()["pending"])
+
+
 class RunCarriedBurstTests(unittest.TestCase):
     def _fixed_frame(self, sequence, received_count):
         return WalkFrame(role=ROLE_FIXED, station=0, sequence=sequence, received_count=received_count).encode()
@@ -286,9 +395,6 @@ class RunCarriedBurstTests(unittest.TestCase):
         self.assertEqual(result.uplink_denominator, 5)
         self.assertEqual(result.uplink_loss_percent, 40)
         self.assertTrue(result.trustworthy)
-        # The LED tracks received downlink frames, not our own transmits --
-        # 4 distinct sequences arrived, so 4 blinks, not 5 (our slot count).
-        self.assertEqual(led.blinks, 4)
         self.assertEqual(len(device.transmitted), 5)
         first_sent = decode_walk_frame(device.transmitted[0])
         self.assertEqual(first_sent.role, ROLE_CARRIED)
@@ -323,9 +429,6 @@ class RunCarriedBurstTests(unittest.TestCase):
         self.assertEqual(result.slots_run, 5)
         self.assertEqual(result.slots_void, 1)
         self.assertEqual(result.uplink_denominator, 4)
-        # Reception, not our own transmit success, drives the blink -- these
-        # two receptions blink regardless of the unrelated transmit failure.
-        self.assertEqual(led.blinks, 2)
         self.assertTrue(result.trustworthy)
 
     def test_total_carrier_sampling_failure_is_not_confirmed_zero_busy(self):
@@ -390,43 +493,62 @@ class RunCarriedBurstTests(unittest.TestCase):
         self.assertEqual(led.blinks, 0)
 
     def test_led_pulse_does_not_consume_the_receive_interval(self):
+        sleeper = BlockingSleeper()
+
+        class DeviceThatWaitsForThePulse(FakeWalkDevice):
+            def wait_data_ready(self, timeout_s):
+                with self._wait_condition:
+                    self.wait_timeouts.append(timeout_s)
+                    wait_count = len(self.wait_timeouts)
+                    self._wait_condition.notify_all()
+                if wait_count == 2:
+                    if not sleeper.wait_for_calls(1):
+                        raise AssertionError("LED worker did not start its pulse")
+                if self._pending:
+                    return True
+                self._clock.sleep(timeout_s)
+                return False
+
         clock = ManualClock()
-        device = FakeWalkDevice(clock)
+        device = DeviceThatWaitsForThePulse(clock)
         device.queue(self._fixed_frame(1, 1))
         led = FakeLed()
+        result = []
+        error = []
 
-        run_carried_burst(
-            device,
-            led,
-            station=1,
-            slots=1,
-            interval_s=0.1,
-            led_pulse_s=0,
-            monotonic=clock,
-        )
+        def run_burst():
+            try:
+                result.append(
+                    run_carried_burst(
+                        device,
+                        led,
+                        station=1,
+                        slots=1,
+                        interval_s=0.1,
+                        led_pulse_s=0.05,
+                        monotonic=clock,
+                        led_sleeper=sleeper,
+                    )
+                )
+            except Exception as exc:  # pragma: no cover - asserted below
+                error.append(exc)
 
-        self.assertEqual(led.blinks, 1)
-        self.assertGreaterEqual(len(device.wait_timeouts), 2)
+        runner = threading.Thread(target=run_burst)
+        runner.start()
+
+        self.assertTrue(sleeper.wait_for_calls(1))
+        self.assertTrue(device.wait_for_receive_waits(2))
+        self.assertTrue(runner.is_alive())
         self.assertAlmostEqual(device.wait_timeouts[0], 0.1)
         self.assertAlmostEqual(device.wait_timeouts[1], 0.1)
 
-    def test_background_led_failure_is_reported(self):
-        clock = ManualClock()
-        device = FakeWalkDevice(clock)
-        device.queue(self._fixed_frame(1, 1))
+        sleeper.release_next()
+        runner.join(timeout=1)
 
-        with self.assertRaises(Nrf905Error) as raised:
-            run_carried_burst(
-                device,
-                FakeLed(fail=True),
-                station=1,
-                slots=1,
-                interval_s=0.1,
-                led_pulse_s=0,
-                monotonic=clock,
-            )
-
-        self.assertEqual(raised.exception.code, "LED_WRITE")
+        self.assertFalse(runner.is_alive())
+        self.assertEqual(error, [])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(sleeper.calls, [0.05])
 
 
 class RunCarriedLoopTests(unittest.TestCase):

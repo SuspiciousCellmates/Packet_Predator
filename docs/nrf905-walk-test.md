@@ -150,20 +150,25 @@ through the RP1 companion chip rather than a raw SoC pin, so treat "it
 behaves the same at the sysfs layer" as expected, not confirmed, until you've
 watched it blink).
 
-**It blinks once per received downlink frame, not per transmit of our own.**
-Our own transmit succeeding is a purely local event and happens regardless of
-range, so it can't tell you anything about the link; gating the blink on
-actually hearing the fixed node instead means walking out of range makes it
-visibly stop, and walking back makes it visibly resume -- walk until it
-stops, walk back until it starts, exactly as the original brief wanted. A
-dark carried node mid-walk now means either out of range or the instrument
-has stopped; there's no way to tell those apart from the LED alone, only from
-whether it resumes when you walk back.
+**Each received downlink frame requests a blink; transmitting our own frame
+does not.** Our own transmit succeeding is a purely local event and happens
+regardless of range, so it cannot say anything about the link. Reception-driven
+feedback means walking out of range makes the LED visibly stop, and walking
+back makes it resume. A dark carried node mid-walk still means either out of
+range or that the instrument has stopped; the LED alone cannot distinguish
+those cases.
 
-A dedicated LED worker performs each 50 ms visible pulse. The radio loop only
-queues the indication, so the LED hold does not consume half of the next 100 ms
-receive interval. Missing devices, permission errors, and background LED writes
-still fail the run with an explicit `LED_*` error.
+A dedicated worker performs the 50 ms visible pulses without holding the radio
+loop. Its capacity is one active pulse plus one waiting notification. The first
+arrival during a pulse schedules one more pulse; later arrivals before that
+notification is consumed merge into it. Because the notifications carry no
+payload, this coalescing preserves the useful signal (traffic is arriving)
+without building a frame-count-sized backlog. Stopping discards the single
+waiting notification and waits only for a pulse already in progress, so
+shutdown time does not grow with the number of received frames. The last
+request at a burst boundary can therefore be coalesced or discarded rather
+than shown as a separate pulse. Missing devices, permission errors, and
+background LED writes still fail the run with an explicit `LED_*` error.
 
 If the onboard LED turns out to be inconvenient or ambiguous on a given
 board, an external LED and resistor on a spare GPIO costs about the same
