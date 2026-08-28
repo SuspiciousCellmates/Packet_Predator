@@ -275,15 +275,28 @@ class SysfsLed:
 
 
 class LedPulseWorker:
-    """Drive 50 ms LED pulses outside the radio receive slot."""
+    """Drive coalesced 50 ms LED pulses outside the radio receive slot.
 
-    def __init__(self, led: SysfsLed, pulse_s: float = 0.050) -> None:
+    A pulse can be active while one further notification waits. Additional
+    requests merge into that waiting notification instead of extending the
+    shutdown path with an unbounded backlog.
+    """
+
+    def __init__(
+        self,
+        led: SysfsLed,
+        pulse_s: float = 0.050,
+        sleeper: Callable[[float], None] = time.sleep,
+    ) -> None:
         if pulse_s < 0:
             raise ValueError("LED pulse duration cannot be negative.")
         self._led = led
         self._pulse_s = pulse_s
+        self._sleeper = sleeper
         self._condition = threading.Condition()
-        self._pending = 0
+        self._pending = False
+        self._active = False
+        self._coalesced_count = 0
         self._closing = False
         self._error: Nrf905Error | None = None
         self._thread = threading.Thread(
@@ -298,12 +311,30 @@ class LedPulseWorker:
             self._raise_error_unlocked()
             if self._closing:
                 raise Nrf905Error("LED_CLOSED", "The walk LED worker is already closed.")
-            self._pending += 1
-            self._condition.notify()
+            if self._pending:
+                self._coalesced_count += 1
+            else:
+                self._pending = True
+                self._condition.notify()
+
+    def status(self) -> dict[str, bool | int]:
+        """Return a thread-safe snapshot of the bounded worker state."""
+
+        with self._condition:
+            return {
+                "active": self._active,
+                "pending": self._pending,
+                "coalesced_count": self._coalesced_count,
+                "closing": self._closing,
+            }
 
     def close(self) -> None:
         with self._condition:
             self._closing = True
+            # A notification carries no payload, so shutdown may discard the
+            # single waiting notification. Only an already-active pulse must
+            # finish before the worker can stop.
+            self._pending = False
             self._condition.notify_all()
         self._thread.join()
         with self._condition:
@@ -312,13 +343,14 @@ class LedPulseWorker:
     def _run(self) -> None:
         while True:
             with self._condition:
-                self._condition.wait_for(lambda: self._pending > 0 or self._closing)
-                if self._pending == 0 and self._closing:
+                self._condition.wait_for(lambda: self._pending or self._closing)
+                if self._closing:
                     return
-                self._pending -= 1
+                self._pending = False
+                self._active = True
             try:
                 self._led.on()
-                time.sleep(self._pulse_s)
+                self._sleeper(self._pulse_s)
                 self._led.off()
             except Nrf905Error as exc:
                 self._record_error(exc)
@@ -326,11 +358,15 @@ class LedPulseWorker:
             except Exception as exc:
                 self._record_error(Nrf905Error("LED_WRITE", str(exc)))
                 return
+            finally:
+                with self._condition:
+                    self._active = False
+                    self._condition.notify_all()
 
     def _record_error(self, error: Nrf905Error) -> None:
         with self._condition:
             self._error = error
-            self._pending = 0
+            self._pending = False
             self._closing = True
             self._condition.notify_all()
 
@@ -347,16 +383,15 @@ def run_carried_burst(
     interval_s: float = 0.100,
     led_pulse_s: float = 0.050,
     monotonic: Callable[[], float] = time.monotonic,
+    led_sleeper: Callable[[float], None] = time.sleep,
 ) -> BurstResult:
     """Walk to a spot, stop, run this once. It measures one station and returns.
 
     Each interval this node transmits its own beacon, then spends the rest of
-    the interval listening for the fixed node's. The LED blinks once per
-    *received* downlink frame, not per transmit of our own -- our own transmit
-    succeeding is a local event that happens regardless of range, so it can't
-    tell you anything about the link. Gating the blink on reception instead
-    means walking out of range makes it visibly stop, and walking back makes
-    it visibly resume: "walk until it stops, walk back until it starts."
+    the interval listening for the fixed node's. Each *received* downlink frame
+    requests LED feedback, while transmit of our own does not. Requests may
+    coalesce when frames arrive faster than the visible pulse can finish, so
+    feedback never delays radio service or creates an unbounded shutdown path.
     """
 
     fixed_sequences: set[int] = set()
@@ -369,7 +404,7 @@ def run_carried_burst(
     carrier_void = 0
     own_sequence = 0
 
-    feedback = LedPulseWorker(led, led_pulse_s)
+    feedback = LedPulseWorker(led, led_pulse_s, sleeper=led_sleeper)
     try:
         for _ in range(slots):
             slot_start = monotonic()
@@ -451,6 +486,7 @@ def run_carried_loop(
     on_result: Optional[Callable[[BurstResult], None]] = None,
     led_pulse_s: float = 0.050,
     monotonic: Callable[[], float] = time.monotonic,
+    led_sleeper: Callable[[float], None] = time.sleep,
 ) -> list[BurstResult]:
     """Run consecutive bursts back to back, auto-incrementing the station
     number, until stopped -- for walking continuously rather than re-invoking
@@ -473,6 +509,7 @@ def run_carried_loop(
         result = run_carried_burst(
             device, led, station=station, slots=slots, interval_s=interval_s,
             led_pulse_s=led_pulse_s, monotonic=monotonic,
+            led_sleeper=led_sleeper,
         )
         results.append(result)
         if on_result is not None:

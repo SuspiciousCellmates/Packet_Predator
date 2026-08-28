@@ -147,8 +147,12 @@ rate and service distribution. A guessed queue size is not acceptable.
 
 ## Walk indicator
 
-`walk-carried` still requests one 50 ms LED indication for each received fixed
-beacon. A dedicated LED worker now performs the on, wait, and off operations,
-so the 50 ms visible hold does not consume the radio receive slot. Device,
-permission, and write failures remain fatal and appear as explicit `LED_*`
-errors.
+`walk-carried` requests a 50 ms LED indication for each received fixed beacon.
+A dedicated LED worker performs the on, wait, and off operations, so the visible
+hold does not consume the radio receive slot. The worker admits one active pulse
+and one waiting notification; arrivals beyond that coalesce because the
+notification has no payload. An arrival during a pulse therefore schedules at
+most one follow-up pulse. Shutdown discards that waiting notification and waits
+only for the active pulse, keeping its work bound independent of the received
+frame count. Device, permission, and write failures remain fatal and appear as
+explicit `LED_*` errors.

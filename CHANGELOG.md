@@ -2,6 +2,9 @@
 
 ## 2026-08-28
 
+- Walk LED feedback now coalesces into at most one active pulse and one waiting
+  notification. Shutdown discards the waiting notification instead of draining
+  a frame-count-sized backlog, while LED failures remain explicit.
 - Manual transmit failures now attempt receive-mode re-entry exactly once
   without retrying RF transmission. A failed re-entry stops the receiver and
   publishes `NRF905_RECEIVE_REENTRY_FAILED` instead of reporting that the radio
