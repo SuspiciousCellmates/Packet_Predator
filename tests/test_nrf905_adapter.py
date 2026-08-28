@@ -48,9 +48,23 @@ class FakeLines:
         self.wait_error = None
         self.edge_monotonic_ns = None
         self.scripted_waits = deque()
+        self.set_failures = deque()
         self.condition = threading.Condition()
 
     def set(self, name, active):
+        if self.set_failures:
+            failed_name, failed_active, remaining, error = self.set_failures[0]
+            if (name, active) == (failed_name, failed_active):
+                remaining -= 1
+                if remaining == 0:
+                    self.set_failures.popleft()
+                    raise error
+                self.set_failures[0] = (
+                    failed_name,
+                    failed_active,
+                    remaining,
+                    error,
+                )
         previous = self.outputs[name]
         self.outputs[name] = active
         self.history.append((name, active))
@@ -84,6 +98,9 @@ class FakeLines:
             self.inputs[name] = active
             self.condition.notify_all()
 
+    def fail_set(self, name, active, error, occurrence=1):
+        self.set_failures.append((name, active, occurrence, error))
+
     def close(self):
         self.closed = True
         self.close_count += 1
@@ -99,9 +116,12 @@ class FakeSpi:
         self.lines = None
         self.mismatch = False
         self.closed = False
+        self.fail_commands = {}
 
     def exchange(self, outgoing):
         command = outgoing[0]
+        if command in self.fail_commands:
+            raise self.fail_commands.pop(command)
         if command == 0x00:
             self.configuration = bytes(outgoing[1:])
             return bytes(len(outgoing))
@@ -328,6 +348,63 @@ class DeviceTests(unittest.TestCase):
         )
         self.assertEqual(self.lines.outputs, {"pwr_up": True, "trx_ce": True, "tx_en": False})
 
+    def test_spi_failure_before_tx_pulse_restores_receive_mode(self):
+        self.device.start()
+        self.spi.fail_commands[0x22] = Nrf905Error(
+            "NRF905_SPI_EXCHANGE",
+            "simulated transmit-address failure",
+        )
+
+        with self.assertRaises(Nrf905Error) as raised:
+            self.device.transmit(bytes(32))
+
+        self.assertEqual(raised.exception.code, "NRF905_SPI_EXCHANGE")
+        self.assertEqual(
+            self.lines.outputs,
+            {"pwr_up": True, "trx_ce": True, "tx_en": False},
+        )
+
+    def test_gpio_failure_after_tx_pulse_restores_receive_mode(self):
+        self.device.start()
+        self.lines.fail_set(
+            "trx_ce",
+            False,
+            Nrf905Error("NRF905_GPIO_WRITE", "simulated completion-pin failure"),
+            occurrence=2,
+        )
+
+        with self.assertRaises(Nrf905Error) as raised:
+            self.device.transmit(bytes(32))
+
+        self.assertEqual(raised.exception.code, "NRF905_GPIO_WRITE")
+        self.assertEqual(
+            self.lines.outputs,
+            {"pwr_up": True, "trx_ce": True, "tx_en": False},
+        )
+
+    def test_receive_reentry_failure_is_distinct_from_transmit_error(self):
+        self.device.start()
+        self.spi.fail_commands[0x22] = Nrf905Error(
+            "NRF905_SPI_EXCHANGE",
+            "simulated transmit-address failure",
+        )
+        self.lines.fail_set(
+            "tx_en",
+            False,
+            Nrf905Error("NRF905_GPIO_WRITE", "simulated re-entry failure"),
+        )
+
+        with self.assertRaises(Nrf905Error) as raised:
+            self.device.transmit(bytes(32))
+
+        self.assertEqual(raised.exception.code, "NRF905_RECEIVE_REENTRY_FAILED")
+        self.assertIn("NRF905_SPI_EXCHANGE", raised.exception.detail)
+        self.assertIn("NRF905_GPIO_WRITE", raised.exception.detail)
+        self.assertEqual(
+            self.lines.outputs,
+            {"pwr_up": True, "trx_ce": False, "tx_en": True},
+        )
+
     def test_invalid_transmit_length_fails_before_spi(self):
         self.device.start()
         with self.assertRaisesRegex(Nrf905Error, "exactly 32 bytes"):
@@ -509,6 +586,54 @@ class PhysicalServiceTests(unittest.TestCase):
             recovered["error"]["code"],
             "NRF905_TRANSMIT_TIMEOUT",
         )
+
+    def test_receive_reentry_failure_faults_and_stops_receiver_without_retry(self):
+        example = self.wire.resolve_example("v1-controller-beacon", "logical")
+        self.service.start()
+        self.spi.fail_commands[0x22] = Nrf905Error(
+            "NRF905_SPI_EXCHANGE",
+            "simulated transmit-address failure",
+        )
+        self.lines.fail_set(
+            "tx_en",
+            False,
+            Nrf905Error("NRF905_GPIO_WRITE", "simulated re-entry failure"),
+        )
+
+        initial = self.service.transmit(
+            example["frame_hex"],
+            "logical",
+            True,
+            "validation-run-reentry-failure",
+        )
+
+        self.assertEqual(initial["outcome"], "unknown")
+        self.assertEqual(
+            initial["error"]["code"],
+            "NRF905_RECEIVE_REENTRY_FAILED",
+        )
+        receiver = self.service.model_state()["receiver"]
+        self.assertEqual(receiver["state"], "faulted")
+        self.assertEqual(receiver["fault_count"], 1)
+        self.assertEqual(
+            receiver["last_error"]["code"],
+            "NRF905_RECEIVE_REENTRY_FAILED",
+        )
+        self.assertFalse(self.service._receiver.running)
+        self.assertEqual(
+            self.lines.outputs,
+            {"pwr_up": True, "trx_ce": False, "tx_en": True},
+        )
+
+        replayed = self.service.transmit(
+            example["frame_hex"],
+            "logical",
+            True,
+            "validation-run-reentry-failure",
+        )
+        self.assertTrue(replayed["replayed_result"])
+        self.assertEqual(replayed["outcome"], "unknown")
+        self.assertEqual(receiver, self.service.model_state()["receiver"])
 
     def test_service_decodes_and_journals_exact_received_frame(self):
         expected = self.wire.resolve_example("v1-node-status", "fixed")

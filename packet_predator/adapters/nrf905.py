@@ -176,39 +176,51 @@ class Nrf905Device:
             )
         with self._lock:
             self._require_started()
-            self.lines.set("trx_ce", False)
-            self.lines.set("tx_en", True)
-            self._exchange(bytes([_W_TX_ADDRESS]) + self.profile.radio.address)
-            self._exchange(bytes([_W_TX_FIFO]) + frame)
-            started_ns = self._monotonic_ns()
-            self.lines.set("trx_ce", True)
-            self.sleep(0.000010)
-            self.lines.set("trx_ce", False)
-            while not self.lines.get("data_ready"):
-                if (self._monotonic_ns() - started_ns) / 1_000_000_000 >= timeout_s:
-                    self.lines.set("tx_en", False)
+            try:
+                self.lines.set("trx_ce", False)
+                self.lines.set("tx_en", True)
+                self._exchange(bytes([_W_TX_ADDRESS]) + self.profile.radio.address)
+                self._exchange(bytes([_W_TX_FIFO]) + frame)
+                started_ns = self._monotonic_ns()
+                self.lines.set("trx_ce", True)
+                self.sleep(0.000010)
+                self.lines.set("trx_ce", False)
+                while not self.lines.get("data_ready"):
+                    if (self._monotonic_ns() - started_ns) / 1_000_000_000 >= timeout_s:
+                        raise Nrf905Error(
+                            "NRF905_TRANSMIT_TIMEOUT",
+                            f"The nRF905 did not report transmit completion within {timeout_s * 1000:.0f} ms.",
+                        )
+                    self.sleep(0.000100)
+                tx_completion_ns = self._monotonic_ns()
+                self._receive_mode()
+                receive_reentry_ns = self._monotonic_ns()
+                return {
+                    "tx_completion_ms": round(
+                        (tx_completion_ns - started_ns) / 1_000_000,
+                        3,
+                    ),
+                    "receive_mode_reentry_ms": round(
+                        (receive_reentry_ns - started_ns) / 1_000_000,
+                        3,
+                    ),
+                    "tx_completion_to_receive_mode_reentry_ms": round(
+                        (receive_reentry_ns - tx_completion_ns) / 1_000_000,
+                        3,
+                    ),
+                    "frame_hex": frame.hex(),
+                }
+            except Exception as transmit_error:
+                try:
                     self._receive_mode()
+                except Exception as reentry_error:
                     raise Nrf905Error(
-                        "NRF905_TRANSMIT_TIMEOUT",
-                        f"The nRF905 did not report transmit completion within {timeout_s * 1000:.0f} ms.",
-                    )
-                self.sleep(0.000100)
-            tx_completion_ns = self._monotonic_ns()
-            self.lines.set("tx_en", False)
-            self._receive_mode()
-            receive_reentry_ns = self._monotonic_ns()
-            return {
-                "tx_completion_ms": round((tx_completion_ns - started_ns) / 1_000_000, 3),
-                "receive_mode_reentry_ms": round(
-                    (receive_reentry_ns - started_ns) / 1_000_000,
-                    3,
-                ),
-                "tx_completion_to_receive_mode_reentry_ms": round(
-                    (receive_reentry_ns - tx_completion_ns) / 1_000_000,
-                    3,
-                ),
-                "frame_hex": frame.hex(),
-            }
+                        "NRF905_RECEIVE_REENTRY_FAILED",
+                        "Transmit failed and receive-mode pins could not be restored: "
+                        f"transmit error [{self._error_code(transmit_error)}] {transmit_error}; "
+                        f"re-entry error [{self._error_code(reentry_error)}] {reentry_error}.",
+                    ) from reentry_error
+                raise
 
     def close(self) -> None:
         with self._lock:
@@ -240,6 +252,10 @@ class Nrf905Device:
 
     def _monotonic_ns(self) -> int:
         return round(self.monotonic() * 1_000_000_000)
+
+    @staticmethod
+    def _error_code(error: Exception) -> str:
+        return error.code if isinstance(error, Nrf905Error) else type(error).__name__
 
     def _require_started(self) -> None:
         if not self._started:

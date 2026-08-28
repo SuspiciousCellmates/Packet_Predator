@@ -230,6 +230,7 @@ class WorkbenchService:
             self._transmit_in_progress[identifier] = signature
 
         receiver_running = False
+        receiver_faulted = False
         try:
             carrier = self._physical_carrier()
             receiver_running = self._receiver is not None and self._receiver.running
@@ -246,6 +247,20 @@ class WorkbenchService:
                         "message": str(exc),
                     }
                 )
+                if error.get("code") == "NRF905_RECEIVE_REENTRY_FAILED":
+                    receiver_faulted = True
+                    if self._receiver is not None and self._receiver.running:
+                        try:
+                            self._receiver.stop()
+                        except Exception as stop_error:
+                            error = {
+                                **error,
+                                "receiver_stop_error": {
+                                    "code": "PHYSICAL_RECEIVER_STOP_FAILED",
+                                    "message": str(stop_error),
+                                },
+                            }
+                    self.model.set_receiver_state("faulted", error)
                 unknown = {
                     "request_id": identifier,
                     "process_instance_id": self.process_instance_id,
@@ -272,7 +287,7 @@ class WorkbenchService:
         finally:
             with self._lock:
                 self._transmit_in_progress.pop(identifier, None)
-            if receiver_running:
+            if receiver_running and not receiver_faulted:
                 self.model.set_receiver_state("listening")
 
     def _remember_transmit_result(

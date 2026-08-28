@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-28
+
+- Manual transmit failures now attempt receive-mode re-entry exactly once
+  without retrying RF transmission. A failed re-entry stops the receiver and
+  publishes `NRF905_RECEIVE_REENTRY_FAILED` instead of reporting that the radio
+  is listening.
+
 ## 2026-08-27
 
 - Physical receiver snapshots now retain bounded summaries for kernel edge to

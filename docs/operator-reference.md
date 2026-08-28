@@ -168,6 +168,7 @@ visible as uncertain.
 | `NRF905_SPI_OPEN` / `NRF905_GPIO_OPEN` | Check permissions and competing processes |
 | `NRF905_REGISTER_MISMATCH` | Check power, CSN, SCK, MOSI, MISO, and actual HAT wiring |
 | `NRF905_TRANSMIT_TIMEOUT` | Check control/DR lines, module power, crystal, and profile |
+| `NRF905_RECEIVE_REENTRY_FAILED` | A transmit error was followed by failed receive-mode cleanup; restart only after checking GPIO access and the radio control lines |
 | `RECEIVE_TIMEOUT` | No matching CRC-valid physical frame arrived before timeout |
 | `RECEIVED_FRAME_MISMATCH` | RF delivered bytes, but they differed from the expected fixture |
 | Browser says reconnecting | The page event stream is reconnecting; inspect receiver state separately |
