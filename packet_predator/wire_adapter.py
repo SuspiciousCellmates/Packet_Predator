@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 
-REQUIRED_AUTHORITY_VERSION = "1.1.0"
+REQUIRED_AUTHORITY_VERSION = "1.2.0"
 
 
 class AuthorityError(RuntimeError):

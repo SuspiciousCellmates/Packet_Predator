@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-31
+
+- Updated the supported workbench and its three finite recordings to consume
+  stable Protocol Contract 1.2.0 through the existing reference-codec boundary.
+  The workbench can structurally inspect the new core-2 `TRANSITION_OUTCOME`
+  examples without producing an outcome or acquiring game authority. This
+  changes no Packet Predator interface, transport behavior, or physical result.
+
 ## 2026-08-28
 
 - Walk LED feedback now coalesces into at most one active pulse and one waiting

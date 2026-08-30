@@ -20,7 +20,9 @@ class SupportedWorkbenchTests(unittest.TestCase):
 
     def test_all_released_examples_inspect_in_logical_and_fixed_forms(self):
         examples = self.wire.list_examples()["examples"]
-        self.assertEqual(len(examples), 38)
+        self.assertEqual(self.wire.version, "1.2.0")
+        self.assertEqual(self.wire.catalog()["message_count"], 39)
+        self.assertEqual(len(examples), 40)
 
         for item in examples:
             with self.subTest(item=item["id"], form="logical"):
@@ -30,6 +32,21 @@ class SupportedWorkbenchTests(unittest.TestCase):
             with self.subTest(item=item["id"], form="fixed"):
                 result = self.wire.inspect(item["padded_frame_hex"], "fixed")
                 self.assertEqual(result["meaning"]["name"], item["name"])
+                self.assertEqual(result["received_bytes"], 32)
+
+    def test_transition_outcome_examples_are_inspection_only(self):
+        for fixture_id, expected_outcome in (
+            ("v1-transition-outcome-enacted", "ENACTED"),
+            ("v1-transition-outcome-superseded", "SUPERSEDED"),
+        ):
+            with self.subTest(fixture=fixture_id):
+                fixture = self.wire.examples_by_id[fixture_id]
+                result = self.wire.inspect(fixture["padded_frame_hex"], "fixed")
+                self.assertEqual(result["meaning"]["name"], "TRANSITION_OUTCOME")
+                outcome = next(
+                    row for row in result["field_rows"] if row["name"] == "outcome"
+                )
+                self.assertEqual(outcome["annotation"]["name"], expected_outcome)
                 self.assertEqual(result["received_bytes"], 32)
 
     def test_plain_language_route_keeps_exact_values(self):
