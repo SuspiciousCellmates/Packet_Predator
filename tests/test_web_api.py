@@ -90,7 +90,7 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(result["carrier"]["mode"], "inspect-only")
         self.assertFalse(result["carrier"]["can_transmit"])
-        self.assertEqual(result["authority"]["authority_version"], "1.1.0")
+        self.assertEqual(result["authority"]["authority_version"], "1.2.0")
         self.assertEqual(result["workbench_interface_version"], 1)
         self.assertTrue(result["process_instance_id"].startswith("pp-"))
 
@@ -168,7 +168,7 @@ class WebApiTests(unittest.TestCase):
         status, _, body = asyncio.run(asgi_request("GET", "/api/v1/examples"))
         examples = json.loads(body)["examples"]
         self.assertEqual(status, 200)
-        self.assertEqual(len(examples), 38)
+        self.assertEqual(len(examples), 40)
 
         status, _, body = asyncio.run(
             asgi_request(
