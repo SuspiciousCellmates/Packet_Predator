@@ -7,22 +7,19 @@ These instructions apply to the entire Packet Predator repository.
 Before planning or editing, read:
 
 1. `README.md`
-2. `docs/roadmap.md`
-3. `docs/architecture.md`
-4. `docs/runtime-inventory.md`
-5. `docs/audit-2026-07-20.md`
-6. every record in `docs/adr/`, in numeric order
-7. `docs/ideas.md`
-8. sibling `../Protocol_Contract/README.md`, `AGENTS.md`, `docs/system-context.md`, and `docs/protocol-v0.md` when protocol behavior is relevant
+2. `docs/architecture.md`
+3. `docs/runtime-inventory.md`
+4. the records in `docs/adr/` that bear on the change
+5. sibling `../Protocol_Contract/README.md` and `docs/system-context.md` when protocol behavior is relevant
 
-## Active-scope rule
+## Scope
 
-- Work only within the active `Now` milestone in `docs/roadmap.md` and `.foundation/milestone.json`.
-- The active nRF905 physical-validation milestone permits the supported runtime under `packet_predator/`, the isolated adapter under `packet_predator/adapters/`, deployment-profile examples under `config/`, deliberate recording data under `recordings/`, the thin frontend under `workbench_web/`, setup/run/diagnostic scripts, tests, and their documentation.
+- Work is scoped by the GitHub issue or request in hand.
+- The supported surface is the runtime under `packet_predator/`, the isolated adapter under `packet_predator/adapters/`, deployment-profile examples under `config/`, deliberate recording data under `recordings/`, the thin frontend under `workbench_web/`, setup/run/diagnostic scripts, tests, and their documentation.
 - Recording data must be finite and fully explicit: no branching, randomness, autonomous actor, inferred response, rules, or condition-driven behavior. References to released contract fixtures are preferred over copied frame definitions.
 - Do not modify or import the archived prototype runtime: `web_app.py`, `web/`, `packet/`, `nodes/`, `driver/`, `decoder.py`, or `simulator.py`. Those paths remain immutable v0/quarantine evidence.
 - The supported default must remain inspect-only and run without radio or Raspberry Pi hardware. Physical access requires an explicit adapter profile; replay still requires explicit selection. Neither may start autonomous actors.
-- Record an out-of-scope idea as one short line in `docs/ideas.md`, then stop work on it.
+- File an out-of-scope idea as a GitHub issue with the `parking-lot` label, then stop work on it.
 - Do not treat quarantined prototype behavior as supported functionality.
 
 ## Hard boundaries
@@ -48,7 +45,7 @@ current state without chat history or source-code archaeology.
 
 - Keep `README.md` accurate for the supported purpose, current status, setup,
   normal use, limitations, and links to deeper documents.
-- Keep the active roadmap, architecture, validation records, and ADRs aligned
+- Keep the architecture, validation records, and ADRs aligned
   with the implementation. Add an ADR when a durable boundary or decision is
   changed; add a dated changelog entry for a user-visible or milestone-level
   change.

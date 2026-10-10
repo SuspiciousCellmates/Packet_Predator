@@ -361,10 +361,7 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
         "README.md",
         "CHANGELOG.md",
         "AGENTS.md",
-        "docs/audit-2026-07-20.md",
         "docs/architecture.md",
-        "docs/roadmap.md",
-        "docs/ideas.md",
         "docs/runtime-inventory.md",
         "docs/adr/0001-foundation-runtime-freeze.md",
         "docs/adr/0003-begin-layered-workbench-runtime.md",
@@ -452,24 +449,6 @@ def verify_documents_and_milestone(root: Path) -> dict[str, Any]:
     ):
         raise GuardError("supported runtime baseline does not preserve the archive manifest")
 
-    roadmap = (root / "docs/roadmap.md").read_text(encoding="utf-8")
-    if (
-        "`nrf905-physical-adapter-validation`: completed on 2026-07-26."
-        not in roadmap
-        or milestone["milestone_id"] not in roadmap
-    ):
-        raise GuardError("docs/roadmap.md does not identify the completed milestone")
-    ordered = [
-        "Reference codec and cross-language conformance suite released as Protocol Contract `1.0.1`.",
-        "`layered-local-workbench`: hardware-free browser inspector, explicit inspect-only carrier, and layered supported entrypoint reviewed and accepted.",
-        "`deterministic-replay-fake-transport`: finite recording replay, fake opaque-frame transport, exact clock controls, and capture provenance reviewed and accepted.",
-        "`nrf905-physical-adapter-validation`: completed on 2026-07-26.",
-        "## Current supporting role — no new Packet Predator milestone selected",
-        "The Game Controller has since completed authoritative state reconstruction,",
-    ]
-    positions = [roadmap.find(text) for text in ordered]
-    if any(position < 0 for position in positions) or positions != sorted(positions):
-        raise GuardError("docs/roadmap.md does not preserve the required milestone order")
     return milestone
 
 
